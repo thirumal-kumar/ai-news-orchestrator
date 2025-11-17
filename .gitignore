@@ -9,3 +9,5 @@ secrets.toml
 # OS files
 *.DS_Store
 .streamlit/
+".env" 
+".env" 
