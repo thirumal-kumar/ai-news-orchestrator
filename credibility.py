@@ -1,45 +1,28 @@
-# credibility.py
-"""
-Simple credibility heuristic:
-- Known reputable domains get higher base score
-- If domain is repeated across many articles => higher trust
-- If domain is unknown, neutral score
-This is intentionally simple; you can extend using external trust databases.
-"""
-
 from collections import Counter
 from urllib.parse import urlparse
 
-# Small curated domain trust map (expandable)
-TRUSTED_DOMAINS = {
-    "reuters.com": 0.95,
-    "bbc.co.uk": 0.92,
-    "bbc.com": 0.92,
-    "nytimes.com": 0.93,
-    "theguardian.com": 0.9,
-    "indianexpress.com": 0.82,
-    "livemint.com": 0.80,
-    "ndtv.com": 0.78,
-    "timesofindia.indiatimes.com": 0.75,
-}
 
 def domain_from_url(url: str) -> str:
-    if not url:
-        return ""
+    """Extract clean domain name from URL."""
     try:
-        p = urlparse(url)
-        return p.netloc.replace("www.", "")
+        d = urlparse(url).netloc.lower().strip()
+        return d.replace("www.", "") if d else ""
     except:
         return ""
 
-def score_sources(article_list):
-    # article_list: list of dicts with 'url', 'source' fields
-    domains = [domain_from_url(a.get("url") or "") for a in article_list]
-    freq = Counter(domains)
-    scores = {}
-    for d in set(domains):
-        base = TRUSTED_DOMAINS.get(d, 0.5)
-        # boost if domain appears multiple times
-        boost = min(0.2, 0.02 * freq.get(d, 1))
-        scores[d] = round(base + boost, 3)
-    return scores
+
+def score_sources(domain_list):
+    """
+    Accepts: list of domain strings like ["bbc.com", "ndtv.com", ...]
+    Returns: { "bbc.com": 0.33, "ndtv.com": 0.17, ... }
+    """
+
+    domain_list = [d for d in domain_list if d]  # remove blanks
+
+    if not domain_list:
+        return {}
+
+    freq = Counter(domain_list)
+    total = sum(freq.values())
+
+    return {d: round(freq[d] / total, 2) for d in freq}

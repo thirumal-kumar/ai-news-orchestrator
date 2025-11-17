@@ -1,74 +1,34 @@
-import os
-import json
-import requests
-from typing import Dict, List
+import spacy
 from collections import defaultdict
 
-OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
-
-MODEL = "anthropic/claude-3.5-sonnet"
-
-
-def call_llm(prompt: str) -> str:
-    """Helper for OpenRouter API calls."""
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0
-    }
-
-    resp = requests.post(url, json=payload, headers=headers, timeout=30)
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+# Load Spacy model safely
+try:
+    nlp = spacy.load("en_core_web_sm")
+except:
+    nlp = None
 
 
-def extract_entities(text: str) -> Dict[str, List[str]]:
+def extract_entities(cleaned_articles):
     """
-    LLM-based Named Entity Recognition (no spaCy).
-    Extracts PERSON, ORG, GPE, DATE using an LLM.
+    Extract PERSON, ORG, GPE, DATE entities from cleaned article text.
+    cleaned_articles = list of dicts with 'cleaned_text'
     """
 
-    if not text or text.strip() == "":
+    if not nlp:
         return {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
 
-    prompt = f"""
-    Extract named entities from the text.
+    all_entities = defaultdict(list)
 
-    Return ONLY JSON with the following keys:
-    PERSON, ORG, GPE, DATE.
+    for art in cleaned_articles:
+        text = art.get("cleaned_text", "")
+        if not text.strip():
+            continue
 
-    If a category has no entities, return an empty list.
+        doc = nlp(text)
 
-    Text:
-    \"\"\"{text}\"\"\"
-    """
+        for ent in doc.ents:
+            if ent.label_ in ["PERSON", "ORG", "GPE", "DATE"]:
+                all_entities[ent.label_].append(ent.text)
 
-    try:
-        result = call_llm(prompt)
-
-        # Handle bad responses gracefully
-        try:
-            data = json.loads(result)
-        except Exception:
-            # fallback: extract lists manually
-            data = {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
-
-        cleaned = defaultdict(list)
-
-        for key in ["PERSON", "ORG", "GPE", "DATE"]:
-            values = data.get(key, [])
-            if isinstance(values, list):
-                cleaned[key] = list(dict.fromkeys([v.strip() for v in values if v.strip()]))
-            else:
-                cleaned[key] = []
-
-        return cleaned
-
-    except Exception:
-        return {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
+    # Deduplicate + sort
+    return {label: sorted(set(values)) for label, values in all_entities.items()}
