@@ -1,55 +1,74 @@
-import openai
 import os
 import json
+import requests
+from typing import Dict, List
+from collections import defaultdict
 
-def extract_entities(text: str) -> dict:
+OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+
+MODEL = "anthropic/claude-3.5-sonnet"
+
+
+def call_llm(prompt: str) -> str:
+    """Helper for OpenRouter API calls."""
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0
+    }
+
+    resp = requests.post(url, json=payload, headers=headers, timeout=30)
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def extract_entities(text: str) -> Dict[str, List[str]]:
     """
-    Cloud-safe LLM-based NER with strict JSON output.
-    Extracts PERSON, ORG, GPE, and DATE entities.
+    LLM-based Named Entity Recognition (no spaCy).
+    Extracts PERSON, ORG, GPE, DATE using an LLM.
     """
 
-    # Not enough text → return empty entities
-    if not text or len(text.strip()) < 30:
+    if not text or text.strip() == "":
         return {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
-
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        return {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
-
-    openai.api_key = api_key
-    openai.api_base = "https://openrouter.ai/api/v1"
 
     prompt = f"""
-Extract PERSON, ORG, GPE, and DATE entities from the following text.
+    Extract named entities from the text.
 
-⚠️ Return ONLY valid JSON, no markdown, no code fences, no comments.
+    Return ONLY JSON with the following keys:
+    PERSON, ORG, GPE, DATE.
 
-Correct format:
-{{
-  "PERSON": ["Alice"],
-  "ORG": ["Google"],
-  "GPE": ["India"],
-  "DATE": ["Monday"]
-}}
+    If a category has no entities, return an empty list.
 
-TEXT:
-{text[:2000]}
-"""
+    Text:
+    \"\"\"{text}\"\"\"
+    """
 
     try:
-        response = openai.ChatCompletion.create(
-            model="openrouter/anthropic/claude-3.5-sonnet",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300
-        )
+        result = call_llm(prompt)
 
-        raw = response["choices"][0]["message"]["content"]
+        # Handle bad responses gracefully
+        try:
+            data = json.loads(result)
+        except Exception:
+            # fallback: extract lists manually
+            data = {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
 
-        # Remove markdown wrappers
-        raw = raw.replace("```json", "").replace("```", "").strip()
+        cleaned = defaultdict(list)
 
-        # Ensure valid JSON
-        return json.loads(raw)
+        for key in ["PERSON", "ORG", "GPE", "DATE"]:
+            values = data.get(key, [])
+            if isinstance(values, list):
+                cleaned[key] = list(dict.fromkeys([v.strip() for v in values if v.strip()]))
+            else:
+                cleaned[key] = []
+
+        return cleaned
 
     except Exception:
         return {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
