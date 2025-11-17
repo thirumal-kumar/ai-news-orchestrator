@@ -1,9 +1,10 @@
-# app_v3.py
 import streamlit as st
-import pandas as pd
 import plotly.express as px
 import os
 
+# -------------------------------
+# IMPORT PROJECT MODULES
+# -------------------------------
 from fetcher import fetch_articles
 from extractor import clean_article
 from combined_summary import combine_snippets
@@ -14,130 +15,157 @@ from credibility import score_sources, domain_from_url
 from event_extractor import extract_events_from_text
 
 
-newsapi_key = os.getenv("NEWSAPI_KEY")
-openrouter_key = os.getenv("OPENROUTER_API_KEY")
-
-# ----------------------------------
-# Page Setup
-# ----------------------------------
+# -------------------------------
+# STREAMLIT PAGE CONFIG
+# -------------------------------
 st.set_page_config(
+    page_title="AI News Orchestrator — GUVI Edition",
     layout="wide",
-    page_title="AI News Orchestrator — GUVI Project by Dr Thirumal",
+    page_icon="📰"
 )
 
-st.title("📰 AI News Orchestrator — GUVI Project by Dr Thirumal")
 
+# -------------------------------
+# SIDEBAR CONFIGURATION
+# -------------------------------
 st.sidebar.header("Configuration")
-query = st.sidebar.text_input("Topic", "Delhi air pollution")
-newsapi_key = st.sidebar.text_input("NewsAPI Key (optional)", type="password")
-max_articles = st.sidebar.slider("Max articles", 4, 12, 8)
-use_llm = st.sidebar.checkbox("Use AI for Timeline Inference", True)
 
-run = st.sidebar.button("Fetch & Analyze")
+topic = st.sidebar.text_input("Topic", "Delhi air pollution")
+news_api_key = st.sidebar.text_input("NewsAPI Key (optional)", type="password")
+
+max_articles = st.sidebar.slider("Max articles", 3, 20, 8)
+use_llm = st.sidebar.checkbox("Use AI for Timeline Inference", value=True)
+
+go = st.sidebar.button("Fetch & Analyze")
 
 
-# ----------------------------------
-# Run Pipeline
-# ----------------------------------
-if run:
+# -------------------------------
+# MAIN UI HEADER
+# -------------------------------
+st.title("📰 AI News Orchestrator — GUVI Edition")
+
+
+# -------------------------------
+# WHEN USER CLICKS FETCH
+# -------------------------------
+if go:
+
     st.info("Fetching articles...")
-    articles = fetch_articles(query, max_results=max_articles, newsapi_key=newsapi_key)
+
+    # 1) FETCH ARTICLES
+    articles = fetch_articles(topic, max_articles, news_api_key)
+
     st.success(f"Fetched {len(articles)} articles.")
 
-    cleaned = [clean_article(a) for a in articles]
+    # CLEAN ARTICLES
+    cleaned = []
+    for a in articles:
+        processed = clean_article(a)
+        cleaned.append(processed)
 
-    # Snippets for combined summary
-    snippets = []
-    for c in cleaned:
-        txt = c.get("cleaned_text") or ""
-        if txt:
-            snippets.append((c.get("title") or "") + " " + txt[:300])
+    # -------------------------------------
+    # COMBINED SUMMARY (LLM)
+    # -------------------------------------
+    snippets = [c.get("cleaned_text", "") for c in cleaned]
+    combined = combine_snippets(snippets)
 
-    # Entities (merged across articles)
-    all_ents = {}
-    for c in cleaned:
-        ents = extract_entities(c.get("cleaned_text"))
-        for k, v in ents.items():
-            all_ents.setdefault(k, set()).update(v)
-
-    # Timeline
-    timeline = build_timeline_from_cleaned(cleaned, use_llm=use_llm)
-
-    # Events for discrepancy detector
-    events_per_article = [
-        extract_events_from_text(c.get("cleaned_text") or "") for c in cleaned
-    ]
-    discrepancies = find_discrepancies(events_per_article)
-
-    # Credibility Score
-    credibility = score_sources(articles)
-
-
-    # ----------------------------------
-    # Tabs for cleaner UI
-    # ----------------------------------
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["📌 Summary", "🕒 Timeline", "🔍 Entities", "⚠ Discrepancies", "📰 Articles", "⭐ Credibility"]
+    # TABS FOR OUTPUT
+    tab_sum, tab_time, tab_ent, tab_disc, tab_art, tab_cred = st.tabs(
+        ["✍ Summary", "⏱ Timeline", "🔍 Entities",
+         "⚠ Discrepancies", "🗞 Articles", "⭐ Credibility"]
     )
 
-    # ---------------- TAB 1: SUMMARY ----------------
-    with tab1:
+    # -------------------------------------
+    # SUMMARY TAB
+    # -------------------------------------
+    with tab_sum:
         st.subheader("Combined Summary")
-        st.markdown("A clean merged summary across all news sources.")
-        st.write(combine_snippets(snippets))
+        st.write(combined)
 
-    # ---------------- TAB 2: TIMELINE ----------------
-    with tab2:
+    # -------------------------------------
+    # TIMELINE TAB
+    # -------------------------------------
+    with tab_time:
         st.subheader("AI-Inferred Timeline of Events")
+        timeline = build_timeline_from_cleaned(cleaned, use_llm=use_llm)
 
-        dated = [t for t in timeline if t["date"]]
-        if dated:
-            df = pd.DataFrame(
-                [{"date": t["date"], "summary": t["summary"]} for t in dated]
-            )
+        if not timeline:
+            st.warning("No timeline events extracted.")
+        else:
+            # PLOT
+            dates = [t["date"] for t in timeline]
+            labels = [t["summary"][:50] for t in timeline]
+
             fig = px.scatter(
-                df,
-                x="date",
-                y=[1]*len(df),
-                hover_data=["summary"],
-                labels={"y": ""},
-                title="Event Timeline"
+                x=dates,
+                y=[1] * len(dates),
+                hover_name=labels,
+                labels={"x": "Date", "y": ""},
+                height=300
             )
-            fig.update_yaxes(visible=False)
             st.plotly_chart(fig, use_container_width=True)
 
-        for t in timeline:
-            dt = t.get("date_iso") or "Undated"
-            st.markdown(f"**{dt}** — {t['summary']}")
-            st.caption("Sources: " + ", ".join(t["sources"]))
-            st.write("---")
+            # DETAILED EVENTS
+            for ev in timeline:
+                st.markdown(
+                    f"**{ev['date']}** — {ev['summary']}\n\n"
+                    f"Sources: {', '.join(ev['sources'])}"
+                )
+                st.markdown("---")
 
-    # ---------------- TAB 3: ENTITIES ----------------
-    with tab3:
+    # -------------------------------------
+    # ENTITY TAB (FIXED VERSION)
+    # -------------------------------------
+    with tab_ent:
         st.subheader("Extracted Key Entities")
-        st.json({k: list(v)[:12] for k, v in all_ents.items()})
 
-    # ---------------- TAB 4: DISCREPANCIES ----------------
-    with tab4:
+        all_entities = {"PERSON": set(), "ORG": set(), "GPE": set(), "DATE": set()}
+
+        for art in cleaned:
+            text = art.get("cleaned_text", "")
+            ents = extract_entities(text)
+
+            for key in all_entities:
+                for item in ents.get(key, []):
+                    if item and item.strip():
+                        all_entities[key].add(item.strip())
+
+        # Display
+        st.json({k: sorted(list(v)) for k, v in all_entities.items()})
+
+    # -------------------------------------
+    # DISCREPANCIES TAB
+    # -------------------------------------
+    with tab_disc:
         st.subheader("Detected Discrepancies Across Articles")
-        if not discrepancies:
-            st.success("No major conflicting claims detected.")
+        disc = find_discrepancies([c["cleaned_text"] for c in cleaned])
+
+        if not disc:
+            st.info("No discrepancies detected.")
         else:
-            for d in discrepancies:
-                st.json(d)
+            st.json(disc)
 
-    # ---------------- TAB 5: ARTICLES ----------------
-    with tab5:
-        st.subheader("Fetched Articles (Detailed View)")
-        for c in cleaned:
-            st.markdown(f"### {c.get('title')}")
-            st.write(f"**Source:** {domain_from_url(c.get('url'))}")
-            st.write(f"**Published:** {c.get('published_at')}")
-            st.write((c.get("cleaned_text") or "")[:500])
-            st.markdown(f"[Open Original]({c.get('url')})")
-            st.write("---")
+    # -------------------------------------
+    # ARTICLES TAB
+    # -------------------------------------
+    with tab_art:
+        st.subheader("Articles (detailed)")
 
-    # ---------------- TAB 6: CREDIBILITY ----------------
-    with tab6:
+        for art in cleaned:
+            st.markdown(f"### {art.get('title', '')}")
+            st.markdown(f"Source: {art.get('source', '')}")
+            st.markdown(f"Published: {art.get('published_at', '')}")
+            st.write(art.get("cleaned_text", ""))
+            st.markdown(f"[Open original]({art.get('url', '')})")
+            st.markdown("---")
+
+    # -------------------------------------
+    # CREDIBILITY TAB
+    # -------------------------------------
+    with tab_cred:
         st.subheader("Credibility Score by Source")
-        st.json(credibility)
+
+        domains = [domain_from_url(a.get("url", "")) for a in cleaned]
+        scores = score_sources(domains)
+
+        st.json(scores)
