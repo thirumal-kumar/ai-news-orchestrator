@@ -1,88 +1,115 @@
-import requests
 import feedparser
-from bs4 import BeautifulSoup
-from dateutil import parser as dateparser
-import time
+import requests
+from urllib.parse import quote
+
+# Import our RSS helper
+from google_news_fetcher_rss import fetch_google_news_articles_rss
 
 
-# -------------------------------------------------------------------
-# Google News RSS Fallback
-# -------------------------------------------------------------------
+# ============================================================
+# Helper: Clean article structure
+# ============================================================
+
+def normalize_article(entry):
+    """Ensure uniform article structure."""
+    return {
+        "title": entry.get("title", "").strip(),
+        "url": entry.get("link") or entry.get("url") or "",
+        "published_at": entry.get("published") or entry.get("pubDate") or "",
+        "source": entry.get("source", "") or entry.get("publisher", "") or "",
+        "summary": entry.get("summary", "") or entry.get("description", "")
+    }
+
+
+# ============================================================
+# Fetch from Google RSS (primary)
+# ============================================================
+
 def fetch_google_rss(query, max_results=10):
-    url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
-    d = feedparser.parse(url)
-
-    articles = []
-    for entry in d.entries[:max_results]:
-        articles.append({
-            "title": entry.title,
-            "url": entry.link,
-            "published_at": entry.get("published"),
-            "source": entry.get("source", {}).get("title", "Google News"),
-            "raw_html": None,  # will be filled by extractor
-        })
-    return articles
+    articles = fetch_google_news_articles_rss(query)
+    normalized = [normalize_article(a) for a in articles]
+    return normalized[:max_results]
 
 
-# -------------------------------------------------------------------
-# NewsAPI (Optional)
-# -------------------------------------------------------------------
-def fetch_newsapi(query, api_key, max_results=10):
+# ============================================================
+# Fallback fetcher: Bing news (no API key required)
+# ============================================================
+
+def fetch_bing_fallback(query, max_results=10):
+    """Very lightweight scraper using Bing's news search HTML."""
+    url = f"https://www.bing.com/news/search?q={quote(query)}"
     try:
-        url = (
-            "https://newsapi.org/v2/everything?"
-            f"q={query}&pageSize={max_results}&apiKey={api_key}"
-        )
-
-        resp = requests.get(url, timeout=10)
-        data = resp.json()
-
-        if data.get("status") != "ok":
+        r = requests.get(url, timeout=5)
+        if r.status_code != 200:
             return []
 
-        articles = []
-        for a in data["articles"]:
-            articles.append({
-                "title": a["title"],
-                "url": a["url"],
-                "published_at": a.get("publishedAt"),
-                "source": a["source"]["name"],
-                "raw_html": None,
-            })
-        return articles
+        # Bing produces messy HTML; this is simple fallback extraction
+        lines = r.text.split("<a")
+        results = []
+
+        for line in lines:
+            if "href=" not in line or "news/search" in line:
+                continue
+            try:
+                link = line.split('href="')[1].split('"')[0]
+                title = line.split(">")[1].split("<")[0]
+                if len(title) > 5 and link.startswith("http"):
+                    results.append({
+                        "title": title,
+                        "url": link,
+                        "published_at": "",
+                        "source": "Bing News",
+                        "summary": ""
+                    })
+            except Exception:
+                pass
+
+        return results[:max_results]
 
     except Exception:
         return []
 
 
-# -------------------------------------------------------------------
-# Combined Fetcher
-# -------------------------------------------------------------------
-def fetch_articles(query, max_results=10, newsapi_key=None):
-    articles = []
+# ============================================================
+# Main universal fetcher (used in app.py)
+# ============================================================
 
-    # First: Google News RSS
+def fetch_articles(query, news_api_key=None, max_results=10):
+    """
+    Main fetcher used by Streamlit.
+    Order:
+     1. Google News RSS (fast, stable)
+     2. Bing fallback (if RSS returns nothing)
+    """
+
+    # ---- FIX: Ensure max_results is always INT ----
     try:
-        rss_results = fetch_google_rss(query, max_results)
-        if rss_results:
-            print(f"Google News RSS returned: {len(rss_results)}")
-            articles.extend(rss_results)
-    except Exception as e:
-        print("Google RSS failed:", e)
+        max_results = int(max_results or 10)
+    except:
+        max_results = 10
+    # ----------------------------------------------
 
-    # Second: NewsAPI (optional)
-    if newsapi_key:
-        api_results = fetch_newsapi(query, newsapi_key, max_results)
-        if api_results:
-            print(f"NewsAPI returned: {len(api_results)}")
-            articles.extend(api_results)
+    all_articles = []
 
-    # Deduplicate by URL
+    # 1. GOOGLE RSS (primary)
+    rss = fetch_google_rss(query, max_results=max_results)
+    all_articles.extend(rss)
+
+    # If RSS gave enough articles, return immediately
+    if len(all_articles) >= max_results:
+        return all_articles[:max_results]
+
+    # 2. BING FALLBACK
+    bing_articles = fetch_bing_fallback(query, max_results=max_results)
+    all_articles.extend(bing_articles)
+
+    # Deduplicate based on URLs
     seen = set()
     unique = []
-    for a in articles:
-        if a["url"] not in seen:
-            seen.add(a["url"])
+    for a in all_articles:
+        url = a.get("url", "")
+        if url and url not in seen:
+            seen.add(url)
             unique.append(a)
 
     return unique[:max_results]
