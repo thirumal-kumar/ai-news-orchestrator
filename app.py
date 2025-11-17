@@ -37,7 +37,7 @@ with st.sidebar:
     OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
     NEWSAPI_KEY = st.secrets.get("NEWS_API_KEY", "")
 
-    st.info("Keys loaded securely via Streamlit Secrets.")
+    st.markdown("### 🔍 Search")
 
 # -------------------------------
 # FETCH ARTICLES
