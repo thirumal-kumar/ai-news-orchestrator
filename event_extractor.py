@@ -1,58 +1,28 @@
-import re
-import dateparser
-from typing import List, Dict, Any
+# event_extractor.py
+from summarizer import _call_openrouter
+import json
 
-# Detect short date formats
-DATE_PATTERN = re.compile(
-    r'\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b'
-)
-
-# Detect month names
-MONTH_PATTERN = re.compile(
-    r'\b(January|February|March|April|May|June|July|August|September|October|November|December'
-    r'|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b',
-    re.IGNORECASE
-)
-
-# Numeric mismatch detection
-NUMBER_PATTERN = re.compile(r'\b\d+(?:\.\d+)?\b')
-
-
-def extract_events_from_text(text: str) -> List[Dict[str, Any]]:
+def extract_events_from_text(text: str):
     """
-    Cloud-safe event extractor WITHOUT spaCy.
-    Uses regex + dateparser + heuristics.
-    Returns list of events: { "sentence", "date", "numbers" }
+    Ask LLM to extract events into a strict JSON list of objects:
+    [{ "date": "...", "date_iso": "...", "sentence":"...", "numbers":[...], "sources":[...]}]
     """
-    events = []
     if not text:
-        return events
-
-    # Split into sentences
-    raw_sentences = re.split(r'(?<=[.!?])\s+', text)
-
-    for sent in raw_sentences:
-        sent = sent.strip()
-        if len(sent) < 40:
-            continue
-
-        # Extract dates
-        dates = DATE_PATTERN.findall(sent)
-        has_month = MONTH_PATTERN.search(sent)
-
-        parsed_date = None
-        if dates:
-            parsed_date = dateparser.parse(dates[0], settings={"STRICT_PARSING": False})
-        elif has_month:
-            parsed_date = dateparser.parse(sent, settings={"STRICT_PARSING": False})
-
-        # Extract numbers
-        nums = NUMBER_PATTERN.findall(sent)
-
-        events.append({
-            "sentence": sent,
-            "date": parsed_date.isoformat() if parsed_date else None,
-            "numbers": nums or []
-        })
-
-    return events
+        return []
+    system = "You are an extractor. Output valid JSON list of event objects with keys: date, date_iso, sentence, numbers, sources."
+    user = (
+        "Extract distinct events from the text. Each event should be an object with:\n"
+        "- date: human-friendly date if present, otherwise null\n"
+        "- date_iso: ISO 8601 if possible, otherwise null\n"
+        "- sentence: the sentence describing the event\n"
+        "- numbers: array of numeric values found\n"
+        "- sources: array of source names if mentioned\n\n"
+        f"Text:\n{text}\n\nReturn JSON only."
+    )
+    messages = [{"role":"system","content":system},{"role":"user","content":user}]
+    out = _call_openrouter(messages, max_tokens=700)
+    try:
+        return json.loads(out)
+    except Exception:
+        # fallback: single event with whole text
+        return [{"date": None, "date_iso": None, "sentence": text[:800], "numbers": [], "sources": []}]
