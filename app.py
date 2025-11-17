@@ -11,7 +11,7 @@ from combined_summary import combine_snippets
 from entity_extractor import extract_entities
 from timeline_builder import build_timeline_from_cleaned
 from credibility import score_sources
-from discrepancy_checker import find_discrepancies   # if you have this file
+from discrepancy_checker import find_discrepancies   # if available
 
 # -------------------------------
 # PAGE CONFIG
@@ -33,122 +33,130 @@ with st.sidebar:
 
     max_articles = st.number_input("Max Articles", min_value=5, max_value=50, value=20)
 
-    # Load secure keys (NEVER store in repo)
+    # Load secure keys from Streamlit Secrets
     OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
     NEWSAPI_KEY = st.secrets.get("NEWS_API_KEY", "")
 
-    st.markdown("### 🔍 Search")
+    # NEW: Search button
+    search_clicked = st.button("🔍 Search")
+
 
 # -------------------------------
-# FETCH ARTICLES
+# RUN PIPELINE ONLY WHEN BUTTON CLICKED
 # -------------------------------
-st.subheader("Fetching articles...")
+if search_clicked:
 
-raw_articles = fetch_articles(query, NEWSAPI_KEY, max_articles)
+    # -------------------------------
+    # FETCH ARTICLES
+    # -------------------------------
+    st.subheader("Fetching articles...")
 
-if not raw_articles:
-    st.error("No articles fetched. Try another query.")
-    st.stop()
+    raw_articles = fetch_articles(query, NEWSAPI_KEY, max_articles)
 
-st.success(f"Fetched {len(raw_articles)} articles.")
+    if not raw_articles:
+        st.error("No articles fetched. Try another query.")
+        st.stop()
 
-# -------------------------------
-# CLEAN ARTICLES (extract text)
-# -------------------------------
-cleaned = []
-for article in raw_articles:
+    st.success(f"Fetched {len(raw_articles)} articles.")
+
+    # -------------------------------
+    # CLEAN ARTICLES (extract readable text)
+    # -------------------------------
+    cleaned = []
+    for article in raw_articles:
+        try:
+            cleaned_article = clean_article(article)
+            cleaned.append(cleaned_article)
+        except Exception as e:
+            st.warning(f"Extractor failed for {article.get('url')}: {e}")
+
+    if not cleaned:
+        st.error("No articles could be cleaned.")
+        st.stop()
+
+    # -------------------------------
+    # SUMMARY
+    # -------------------------------
+    summary_text = combine_snippets(cleaned)
+
+    # -------------------------------
+    # TIMELINE
+    # -------------------------------
+    timeline = build_timeline_from_cleaned(cleaned)
+
+    # -------------------------------
+    # ENTITIES
+    # -------------------------------
+    entities = extract_entities(cleaned)
+
+    # -------------------------------
+    # DISCREPANCIES
+    # -------------------------------
     try:
-        cleaned_article = clean_article(article)  # returns dict with cleaned_text
-        cleaned.append(cleaned_article)
-    except Exception as e:
-        st.warning(f"Extractor failed on {article.get('url')}: {e}")
+        discrepancies = find_discrepancies(cleaned)
+    except:
+        discrepancies = {}
 
-if not cleaned:
-    st.error("No articles could be cleaned.")
-    st.stop()
+    # -------------------------------
+    # CREDIBILITY
+    # -------------------------------
+    credibility_scores = score_sources(cleaned)
 
-# -------------------------------
-# SUMMARY
-# -------------------------------
-summary_text = combine_snippets(cleaned)
+    # -------------------------------
+    # TABS
+    # -------------------------------
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        ["📌 Summary", "⏱ Timeline", "🔍 Entities", "⚠ Discrepancies", "📰 Articles", "⭐ Credibility"]
+    )
 
-# -------------------------------
-# TIMELINE
-# -------------------------------
-timeline = build_timeline_from_cleaned(cleaned)
+    # -------------------------------
+    # TAB 1 — SUMMARY
+    # -------------------------------
+    with tab1:
+        st.subheader("Consolidated Summary")
+        st.write(summary_text)
 
-# -------------------------------
-# ENTITIES
-# -------------------------------
-entities = extract_entities(cleaned)
+    # -------------------------------
+    # TAB 2 — TIMELINE
+    # -------------------------------
+    with tab2:
+        st.subheader("Publication Timeline")
+        st.json(timeline)
 
-# -------------------------------
-# DISCREPANCIES (optional)
-# -------------------------------
-try:
-    discrepancies = find_discrepancies(cleaned)
-except:
-    discrepancies = {}
+    # -------------------------------
+    # TAB 3 — ENTITIES
+    # -------------------------------
+    with tab3:
+        st.subheader("Named Entities")
+        st.json(entities)
 
-# -------------------------------
-# CREDIBILITY
-# -------------------------------
-credibility_scores = score_sources(cleaned)
+    # -------------------------------
+    # TAB 4 — DISCREPANCIES
+    # -------------------------------
+    with tab4:
+        st.subheader("Cross-Article Discrepancies")
+        st.json(discrepancies)
 
-# -------------------------------
-# TABS
-# -------------------------------
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["📌 Summary", "⏱ Timeline", "🔍 Entities", "⚠ Discrepancies", "📰 Articles", "⭐ Credibility"]
-)
+    # -------------------------------
+    # TAB 5 — ARTICLES
+    # -------------------------------
+    with tab5:
+        st.subheader("Fetched & Cleaned Articles")
+        st.json(cleaned)
 
-# -------------------------------
-# TAB 1 — SUMMARY
-# -------------------------------
-with tab1:
-    st.subheader("Consolidated Summary")
-    st.write(summary_text)
+    # -------------------------------
+    # TAB 6 — CREDIBILITY
+    # -------------------------------
+    with tab6:
+        st.subheader("Source Credibility Scores")
+        st.json(credibility_scores)
 
-# -------------------------------
-# TAB 2 — TIMELINE
-# -------------------------------
-with tab2:
-    st.subheader("Publication Timeline")
-    st.json(timeline)
+        # Simple Plotly bar chart
+        if credibility_scores:
+            df = {
+                "domain": list(credibility_scores.keys()),
+                "score": list(credibility_scores.values())
+            }
+            fig = px.bar(df, x="domain", y="score", title="Credibility by Source", width=900)
+            st.plotly_chart(fig)
 
-# -------------------------------
-# TAB 3 — ENTITIES
-# -------------------------------
-with tab3:
-    st.subheader("Named Entity Extraction")
-    st.json(entities)
-
-# -------------------------------
-# TAB 4 — DISCREPANCIES
-# -------------------------------
-with tab4:
-    st.subheader("Cross-Article Discrepancies")
-    st.json(discrepancies)
-
-# -------------------------------
-# TAB 5 — ARTICLES
-# -------------------------------
-with tab5:
-    st.subheader("Fetched Articles")
-    st.json(cleaned)
-
-# -------------------------------
-# TAB 6 — CREDIBILITY
-# -------------------------------
-with tab6:
-    st.subheader("Source Credibility Score")
-    st.json(credibility_scores)
-
-    # also plot bar chart
-    if credibility_scores:
-        df = {
-            "domain": list(credibility_scores.keys()),
-            "score": list(credibility_scores.values())
-        }
-        fig = px.bar(df, x="domain", y="score", title="Credibility by Source", width=900)
-        st.plotly_chart(fig)
