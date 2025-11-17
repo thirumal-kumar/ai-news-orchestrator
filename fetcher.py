@@ -1,183 +1,88 @@
-# fetcher.py
-"""
-Unified news fetch pipeline:
-1) Google News RSS (PRIMARY)
-2) NewsAPI (secondary)
-3) RSS feeds (fallback)
-"""
-
-import os
-import json
-import time
-import hashlib
-from typing import List, Dict, Optional
-
 import requests
 import feedparser
-
-# Google News RSS module
-from google_news_fetcher_rss import fetch_google_news_articles_rss
-
-# -------------------------------
-# RSS FEEDS
-# -------------------------------
-DEFAULT_RSS_FEEDS = [
-    "http://feeds.bbci.co.uk/news/rss.xml",
-    "http://feeds.reuters.com/reuters/topNews",
-    "https://www.theguardian.com/world/rss",
-]
-
-DATA_RAW_DIR = os.path.join("data", "raw")
-os.makedirs(DATA_RAW_DIR, exist_ok=True)
+from bs4 import BeautifulSoup
+from dateutil import parser as dateparser
+import time
 
 
-# -------------------------------
-# SAVE RAW ARTICLE
-# -------------------------------
-def _save_raw_article(article: Dict) -> str:
-    key = (article.get("url", "") + (article.get("title") or "")).encode("utf-8")
-    fname = hashlib.sha256(key).hexdigest()[:16] + ".json"
-    path = os.path.join(DATA_RAW_DIR, fname)
+# -------------------------------------------------------------------
+# Google News RSS Fallback
+# -------------------------------------------------------------------
+def fetch_google_rss(query, max_results=10):
+    url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
+    d = feedparser.parse(url)
 
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(article, f, ensure_ascii=False, indent=2)
+    articles = []
+    for entry in d.entries[:max_results]:
+        articles.append({
+            "title": entry.title,
+            "url": entry.link,
+            "published_at": entry.get("published"),
+            "source": entry.get("source", {}).get("title", "Google News"),
+            "raw_html": None,  # will be filled by extractor
+        })
+    return articles
 
-    return path
 
+# -------------------------------------------------------------------
+# NewsAPI (Optional)
+# -------------------------------------------------------------------
+def fetch_newsapi(query, api_key, max_results=10):
+    try:
+        url = (
+            "https://newsapi.org/v2/everything?"
+            f"q={query}&pageSize={max_results}&apiKey={api_key}"
+        )
 
-# -------------------------------
-# NEWSAPI FETCH
-# -------------------------------
-def fetch_from_newsapi(query: str, api_key: Optional[str], max_results: int):
-    if not api_key:
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+
+        if data.get("status") != "ok":
+            return []
+
+        articles = []
+        for a in data["articles"]:
+            articles.append({
+                "title": a["title"],
+                "url": a["url"],
+                "published_at": a.get("publishedAt"),
+                "source": a["source"]["name"],
+                "raw_html": None,
+            })
+        return articles
+
+    except Exception:
         return []
 
-    endpoint = "https://newsapi.org/v2/everything"
-    params = {
-        "q": query,
-        "pageSize": max_results,
-        "language": "en",
-        "sortBy": "publishedAt",
-    }
-    headers = {"Authorization": api_key}
 
-    resp = requests.get(endpoint, params=params, headers=headers, timeout=15)
-    data = resp.json()
-    items = data.get("articles", [])
+# -------------------------------------------------------------------
+# Combined Fetcher
+# -------------------------------------------------------------------
+def fetch_articles(query, max_results=10, newsapi_key=None):
+    articles = []
 
-    out = []
-    for it in items:
-        a = {
-            "source": it.get("source", {}).get("name"),
-            "title": it.get("title"),
-            "url": it.get("url"),
-            "published_at": it.get("publishedAt"),
-            "summary": it.get("description"),
-            "content": it.get("content"),
-            "fetched_with": "newsapi",
-        }
-        a["saved_path"] = _save_raw_article(a)
-        out.append(a)
-    return out
-
-
-# -------------------------------
-# RSS FETCH (Fallback)
-# -------------------------------
-def _normalize_rss_entry(entry):
-    published = entry.get("published") or entry.get("updated")
-    return {
-        "source": entry.get("source", {}).get("title"),
-        "title": entry.get("title"),
-        "url": entry.get("link"),
-        "published_at": published,
-        "summary": entry.get("summary"),
-        "content": entry.get("summary"),
-        "fetched_with": "rss",
-    }
-
-
-def fetch_from_rss(rss_urls: List[str], query: str, max_results_per_feed: int):
-    out = []
-    for url in rss_urls:
-        try:
-            feed = feedparser.parse(url)
-        except:
-            continue
-
-        entries = feed.entries[:max_results_per_feed]
-        for e in entries:
-            a = _normalize_rss_entry(e)
-
-            text = ((a.get("title") or "") + " " + (a.get("summary") or "")).lower()
-            if query.lower() not in text:
-                continue
-
-            a["feed_url"] = url
-            a["saved_path"] = _save_raw_article(a)
-            out.append(a)
-
-        time.sleep(0.1)
-
-    return out
-
-
-# -------------------------------
-# MAIN FETCH PIPELINE
-# -------------------------------
-def fetch_articles(query: str, max_results=10, newsapi_key=None, rss_feeds=None):
-    print("=== FETCHING ARTICLES ===")
-    print("Query:", query)
-
-    if rss_feeds is None:
-        rss_feeds = DEFAULT_RSS_FEEDS
-
-    results = []
-
-    # -------------------------------
-    # 1) Google News RSS PRIMARY
-    # -------------------------------
-    print("Trying Google News (RSS)...")
+    # First: Google News RSS
     try:
-        gn = fetch_google_news_articles_rss(query, max_results=max_results)
-        print("Google News RSS returned:", len(gn))
-
-        for g in gn:
-            g["saved_path"] = _save_raw_article(g)
-
-        results.extend(gn)
+        rss_results = fetch_google_rss(query, max_results)
+        if rss_results:
+            print(f"Google News RSS returned: {len(rss_results)}")
+            articles.extend(rss_results)
     except Exception as e:
-        print("Google News RSS failed:", e)
+        print("Google RSS failed:", e)
 
-    if len(results) >= max_results:
-        return results[:max_results]
+    # Second: NewsAPI (optional)
+    if newsapi_key:
+        api_results = fetch_newsapi(query, newsapi_key, max_results)
+        if api_results:
+            print(f"NewsAPI returned: {len(api_results)}")
+            articles.extend(api_results)
 
-    # -------------------------------
-    # 2) NEWSAPI SECONDARY
-    # -------------------------------
-    print("Trying NewsAPI...")
-    try:
-        na = fetch_from_newsapi(query, newsapi_key, max_results)
-        print("NewsAPI returned:", len(na))
+    # Deduplicate by URL
+    seen = set()
+    unique = []
+    for a in articles:
+        if a["url"] not in seen:
+            seen.add(a["url"])
+            unique.append(a)
 
-        results.extend(na)
-    except Exception as e:
-        print("NewsAPI failed:", e)
-
-    if len(results) >= max_results:
-        return results[:max_results]
-
-    # -------------------------------
-    # 3) RSS FALLBACK
-    # -------------------------------
-    print("Trying RSS feeds...")
-    remaining = max_results - len(results)
-    per_feed = max(1, remaining // len(rss_feeds))
-
-    rss_items = fetch_from_rss(rss_feeds, query, per_feed)
-    print("RSS returned:", len(rss_items))
-
-    results.extend(rss_items[:remaining])
-
-    print("=== TOTAL FETCHED:", len(results))
-    return results[:max_results]
+    return unique[:max_results]
