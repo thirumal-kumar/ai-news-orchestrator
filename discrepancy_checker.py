@@ -1,40 +1,73 @@
 # discrepancy_checker.py
-from typing import List, Dict
-import re
-from collections import defaultdict
 
-def _extract_numbers_from_text(s: str):
-    nums = re.findall(r"\b\d{1,4}(?:,\d{3})*(?:\.\d+)?\b", s)
-    return [n.replace(",", "") for n in nums]
+def safe_text(x):
+    if not x:
+        return ""
+    if isinstance(x, dict):
+        return x.get("cleaned_text", "") or ""
+    return str(x)
 
-def find_discrepancies(events_per_article: List[List[Dict]]) -> List[Dict]:
+def find_discrepancies(cleaned_articles):
     """
-    events_per_article: list of lists (events extracted per article)
-    Return list of discrepancy objects.
+    Identify contradictions across article texts, titles, or published dates.
+    cleaned_articles: list of dicts (from extractor + fetcher)
+    Returns: dict summarizing possible discrepancies
     """
-    # flatten events to compare sentences and numeric claims
-    flat = []
-    for ai, events in enumerate(events_per_article):
-        for ev in events:
-            flat.append((ai, ev))
-    discrepancies = []
-    # simple pairwise numeric mismatch detector
-    for i in range(len(flat)):
-        ai, e1 = flat[i]
-        s1 = e1.get("sentence", "") if isinstance(e1, dict) else str(e1)
-        n1 = _extract_numbers_from_text(s1)
-        for j in range(i+1, len(flat)):
-            aj, e2 = flat[j]
-            s2 = e2.get("sentence", "") if isinstance(e2, dict) else str(e2)
-            n2 = _extract_numbers_from_text(s2)
-            if n1 and n2 and set(n1) != set(n2):
-                discrepancies.append({
-                    "a_article": ai,
-                    "b_article": aj,
-                    "sent_a": s1,
-                    "sent_b": s2,
-                    "numbers_a": n1,
-                    "numbers_b": n2,
-                    "similarity": None
-                })
+
+    discrepancies = {
+        "conflicting_dates": [],
+        "conflicting_titles": [],
+        "textual_mismatch_pairs": []
+    }
+
+    # --------------------------
+    # COLLECT FIELDS
+    # --------------------------
+    titles = []
+    dates = []
+    texts = []
+
+    for art in cleaned_articles:
+        titles.append(art.get("title") or "")
+        dates.append(art.get("published_at") or "")
+        texts.append(safe_text(art))
+
+    # --------------------------
+    # DATE CONTRADICTIONS
+    # --------------------------
+    unique_dates = set([d for d in dates if d])
+    if len(unique_dates) > 1:
+        discrepancies["conflicting_dates"] = list(unique_dates)
+
+    # --------------------------
+    # TITLE CONTRADICTIONS
+    # --------------------------
+    unique_titles = set([t.strip() for t in titles if t])
+    if len(unique_titles) > 1:
+        discrepancies["conflicting_titles"] = list(unique_titles)
+
+    # --------------------------
+    # TEXTUAL SIMILARITY CHECK
+    # --------------------------
+    # Very lightweight heuristic: length mismatch or keyword mismatch
+    for i in range(len(texts)):
+        for j in range(i + 1, len(texts)):
+            t1, t2 = texts[i], texts[j]
+
+            if not t1 or not t2:
+                continue
+
+            # Heuristic mismatch: texts differ by >70% length
+            len1, len2 = len(t1), len(t2)
+            length_ratio = abs(len1 - len2) / max(len1, len2)
+
+            if length_ratio > 0.7:
+                discrepancies["textual_mismatch_pairs"].append(
+                    {
+                        "article_1_title": titles[i],
+                        "article_2_title": titles[j],
+                        "reason": f"Large content mismatch ({length_ratio:.2f})"
+                    }
+                )
+
     return discrepancies

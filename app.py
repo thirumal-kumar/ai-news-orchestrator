@@ -135,7 +135,11 @@ if search_clicked:
     # -------------------------------
     with tab4:
         st.subheader("Cross-Article Discrepancies")
-        st.json(discrepancies)
+
+        if not discrepancies:
+            st.info("No major discrepancies detected across articles.")
+        else:
+            st.json(discrepancies)
 
     # -------------------------------
     # TAB 5 — ARTICLES
@@ -151,7 +155,6 @@ if search_clicked:
         st.subheader("Source Credibility Scores")
         st.json(credibility_scores)
 
-        # Simple Plotly bar chart
         if credibility_scores:
             df = {
                 "domain": list(credibility_scores.keys()),
@@ -159,4 +162,3 @@ if search_clicked:
             }
             fig = px.bar(df, x="domain", y="score", title="Credibility by Source", width=900)
             st.plotly_chart(fig)
-
