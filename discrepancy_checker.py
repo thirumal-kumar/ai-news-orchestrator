@@ -1,72 +1,89 @@
-# discrepancy_checker.py
-"""
-Discrepancy checker:
-- For each pair of article event sentences, compute simple similarity.
-- Flag pairs where the overlap is low but they refer to same subject (heuristic)
-- Detect numeric or date mismatches using regex/dateparser
-"""
-
 import re
 from difflib import SequenceMatcher
-from typing import List, Dict
-import dateparser
+from typing import List, Dict, Any
 
 
-def _similar(a: str, b: str) -> float:
+# Helper: extract numbers from text
+def _extract_numbers(text: str):
+    return re.findall(r"\d+", text)
+
+
+# Helper: extract first date-like token
+def _find_first_date(text: str):
+    m = re.search(r"\b(?:\d{4}|\d{1,2}\s+\w+|\w+\s+\d{1,2})\b", text)
+    return m.group(0) if m else None
+
+
+def _similarity(a: str, b: str):
     return SequenceMatcher(None, a, b).ratio()
 
 
-def _find_first_date(text: str):
-    dt = dateparser.parse(text, settings={"PREFER_DATES_FROM": "past"})
-    return dt
-
-
-def _extract_numbers(text: str):
-    return re.findall(r"\d{1,4}(?:\.\d+)?", text)
-
-
-def find_discrepancies(events_per_article: List[List[Dict]]) -> List[Dict]:
+def _normalize_entry(e):
     """
-    events_per_article: list where each element is the list of events (dicts) for an article
-    returns list of discrepancies: {a_idx, b_idx, sent_a, sent_b, similarity, date_a, date_b, numbers_a, numbers_b}
+    Accepts either:
+        - "string"
+        - {"sentence": "...", "date": "..."}
+    Converts to uniform format.
     """
-    discrepancies = []
-    # flatten with article index and event idx
+    if isinstance(e, str):
+        return {"sentence": e, "date": None}
+    if isinstance(e, dict):
+        return {
+            "sentence": e.get("sentence", ""),
+            "date": e.get("date"),
+        }
+    # fallback
+    return {"sentence": str(e), "date": None}
+
+
+def find_discrepancies(entries: List[Any]) -> List[Dict[str, Any]]:
+    """
+    entries = list of cleaned article texts (strings)
+              OR list of event dicts ({sentence:..., date:...})
+
+    Output: list of discrepancy records.
+    """
+
+    # Normalize all inputs
+    normalized = [_normalize_entry(e) for e in entries]
+
     flat = []
-    for ai, evs in enumerate(events_per_article):
-        for ei, ev in enumerate(evs):
-            flat.append((ai, ei, ev))
+    for idx, e in enumerate(normalized):
+        s = e["sentence"]
+        d = _find_first_date(s)
+        nums = _extract_numbers(s)
+        flat.append((idx, 0, {"sentence": s, "date": d, "numbers": nums}))
+
+    discrepancies = []
 
     N = len(flat)
     for i in range(N):
-        ai, ei, e1 = flat[i]
-        s1 = e1.get("sentence", "")
-        d1 = _find_first_date(s1)
-        nums1 = _extract_numbers(s1)
+        ai, _, e1 = flat[i]
+        s1 = e1["sentence"]
+        d1 = e1["date"]
+        nums1 = e1["numbers"]
 
-        for j in range(i+1, N):
-            aj, ej, e2 = flat[j]
-            s2 = e2.get("sentence", "")
-            d2 = _find_first_date(s2)
-            nums2 = _extract_numbers(s2)
+        for j in range(i + 1, N):
+            bi, _, e2 = flat[j]
+            s2 = e2["sentence"]
+            d2 = e2["date"]
+            nums2 = e2["numbers"]
 
-            sim = _similar(s1, s2)
-            # If similarity < 0.5 but they mention same key entities (heuristic), mark as discrepancy
-            if sim < 0.5:
-                # numeric mismatch detection
-                if nums1 and nums2 and nums1 != nums2:
+            sim = _similarity(s1, s2)
+
+            # If sentences differ significantly but talk same topic
+            if sim < 0.55:
+                if nums1 != nums2 or d1 != d2:
                     discrepancies.append({
-                        "a_article": ai, "a_event": ei, "b_article": aj, "b_event": ej,
-                        "sent_a": s1, "sent_b": s2, "similarity": sim,
-                        "date_a": d1 and d1.isoformat(), "date_b": d2 and d2.isoformat(),
-                        "numbers_a": nums1, "numbers_b": nums2
+                        "a_article": ai,
+                        "b_article": bi,
+                        "sent_a": s1,
+                        "sent_b": s2,
+                        "similarity": sim,
+                        "date_a": d1,
+                        "date_b": d2,
+                        "numbers_a": nums1,
+                        "numbers_b": nums2,
                     })
-                # date mismatch
-                elif d1 and d2 and d1.date() != d2.date() and sim < 0.6:
-                    discrepancies.append({
-                        "a_article": ai, "a_event": ei, "b_article": aj, "b_event": ej,
-                        "sent_a": s1, "sent_b": s2, "similarity": sim,
-                        "date_a": d1.date().isoformat(), "date_b": d2.date().isoformat(),
-                        "numbers_a": nums1, "numbers_b": nums2
-                    })
+
     return discrepancies
