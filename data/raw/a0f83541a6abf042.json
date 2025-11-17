@@ -1,0 +1,22 @@
+{
+  "source": "NPR",
+  "title": "AI steps in to detect the world's deadliest infectious disease",
+  "url": "https://www.npr.org/sections/goats-and-soda/2025/11/06/g-s1-96448/ai-artificial-intelligence-tb-tuberculosis",
+  "published_at": "2025-11-06T12:30:30Z",
+  "summary": "There's a global shortage of radiologists. Now artificial intelligence is helping speed up the diagnosis of tuberculosis in hard-to-reach communities.",
+  "content": "On a Thursday morning last month, Boniaba Community Health Center in Mali was running a TB screening. There was no doctor in sight. Yet, a mother plagued by coughing got an answer in a matter of seco… [+8822 chars]",
+  "raw": {
+    "source": {
+      "id": null,
+      "name": "NPR"
+    },
+    "author": "Gabrielle Emanuel",
+    "title": "AI steps in to detect the world's deadliest infectious disease",
+    "description": "There's a global shortage of radiologists. Now artificial intelligence is helping speed up the diagnosis of tuberculosis in hard-to-reach communities.",
+    "url": "https://www.npr.org/sections/goats-and-soda/2025/11/06/g-s1-96448/ai-artificial-intelligence-tb-tuberculosis",
+    "urlToImage": "https://npr.brightspotcdn.com/dims3/default/strip/false/crop/1776x999+0+0/resize/1400/quality/100/format/jpeg/?url=http%3A%2F%2Fnpr-brightspot.s3.amazonaws.com%2Fc1%2Fa5%2F2b06ebe643fba2be5b5bae35d782%2Ftb-diptych3-final.jpg",
+    "publishedAt": "2025-11-06T12:30:30Z",
+    "content": "On a Thursday morning last month, Boniaba Community Health Center in Mali was running a TB screening. There was no doctor in sight. Yet, a mother plagued by coughing got an answer in a matter of seco… [+8822 chars]"
+  },
+  "fetched_with": "newsapi"
+}

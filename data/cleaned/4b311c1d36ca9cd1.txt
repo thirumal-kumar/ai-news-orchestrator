@@ -1,0 +1,85 @@
+For Neal Shah, the breaking point came during his wife's cancer treatment.
+
+He remembers being overwhelmed, surrounded by stacks of hospital bills, denial notices and insurance statements. When he and his wife tallied everything -- from monthly premiums and out-of-pocket costs to uncovered treatments -- they realized the shocking truth that over the years, they might have been better off paying entirely out of pocket than carrying health insurance at all.
+
+At first, Shah chalked all of the bills and denials up to bad luck.
+
+"Then, I went down a rabbit hole of research, of just trying to figure out what is going on with health insurance?" he told CNET. "Why are there so many denials of claims? How many people is it impacting? And then I just got obsessive about it."
+
+Zooey Liao/CNET
+
+That obsessiveness and frustration became the seed for CareYaya, a North Carolina-based company Shah launched to connect college students entering the health care field with families in need of affordable caregiving. But even as CareYaya grew, Shah kept encountering the all-too-familiar situation of patients, caregivers and students completely overwhelmed by health insurance claim denials.
+
+"I realized I'm not alone and the people using CareYaya are not alone," Shah said. "There are millions of Americans dealing with this problem. People are drowning in denial claims."
+
+Last year, Shah launched another startup, Counterforce Health, which offers a free platform that generates customized insurance appeal letters in minutes.
+
+Counterforce's platform allows patients or clinics to upload denial letters and relevant medical records. The system analyzes insurance policies, reviews medical literature and draws from successful appeals to produce a draft response. Users can edit the letter before submitting it, but the AI tool does the heavy lifting of translating dense health care policies and clinical arguments and structuring an appeal.
+
+As denials climb nationwide and debates about ethical AI use ramp up, the company's arrival comes at a pivotal moment. Health insurers are increasingly turning to AI to review claims, which is resulting in more denials and frustration for patients seeking help. Counterforce is trying to flip the script, using AI not to block coverage but to help patients win it back.
+
+Essentially, AI is fighting AI.
+
+Don't miss any of our unbiased tech content and lab-based reviews. Add CNET as a preferred Google source on Chrome.
+
+Denials on the rise nationwide
+
+Health insurance denials have become a defining feature of the American health care system. Patients pay rising premiums, deductibles and copays, only to find that insurers often refuse to cover the treatments their doctors recommend.
+
+The numbers tell their own tragic story.
+
+According to data from KFF, 20% of all claims across Affordable Care Act marketplace plans were denied in 2023. ACA plans covered more than 20 million Americans at the start of 2025. Audits have found that insurers wrongly deny or delay millions of requests for care each year in Medicare Advantage, which covers more than 30 million Americans.
+
+Yet appeals remain rare. Fewer than 1% of ACA plan denials are challenged.
+
+"Ninety-nine percent of patients or family caregivers do not appeal," Shah said. "Of the tiny fraction who do, 40% win. That tells you most people are intimidated, don't know their rights or just assume a denial is final. And it also shows how frivolous so many of these denials are."
+
+In recent years, AI has amplified this imbalance. Major insurers have turned to AI tools that scan medical records, apply coverage rules and generate denial letters in bulk. Investigations have found some algorithms making near-instantaneous denials, even when the treating provider recommended the care.
+
+In 2022, a ProPublica investigation revealed that Cigna used an AI-driven algorithm to deny more than 30,000 claims in just two months, often without a human physician ever reviewing the files.
+
+The following year, a class-action lawsuit accused UnitedHealth of deploying its AI tool, known as nH Predict, to cut off care prematurely for elderly Medicare patients, regardless of their doctors' recommendations. That lawsuit was filed in 2023, a year before the killing of then-UnitedHealth CEO Brian Thompson, which intensified national scrutiny of how insurance giants use denials to control costs.
+
+Critics, like Shah, say these systems reduce patients to data points, prioritizing costs over ethics.
+
+"Writing an appeal letter can take eight hours between digging through billing codes, medical journals and citations," Shah said. "For the average American, that's like a full-time job on top of everything else they're dealing with."
+
+Patients are often required to enter a nauseating loop when dealing with the health care system: claims are filed, claims are denied by machines, appeal processes are buried and, eventually, life-altering care is delayed or abandoned altogether.
+
+Flipping the script
+
+Against this backdrop of rising denials and AI-automated gatekeeping, Counterforce Health is positioning itself as a counterpunch, going lick for lick with big health insurance companies deploying AI to deny claims. Instead of patients drowning in paperwork or giving up, the Counterforce platform arms them with the tools to push back quickly and effectively.
+
+"Right now, insurers are using AI to deny claims in seconds, while patients and doctors spend hours fighting back," Shah said. "That's not a fair fight. Our mission is to flip the script and make appeals as easy as one click."
+
+When a denial letter is uploaded, Counterforce's system doesn't just produce boilerplate text; it analyzes the insurer's rationale and draws on clinical research and other appeals that have succeeded under similar circumstances. The goal is to create tailored, evidence-driven appeals that are hard for insurers to dismiss, while also saving patients and their families hundreds of hours of research and drafting appeal letters.
+
+Many patients simply don't have the time, energy or resources to fight appeals. As Dr. David Casarett, a professor of medicine at Duke and section chief of palliative care at Duke Health, told CNET, some patients "step into the ring with boxing gloves on," but many just give up, go into debt or forgo treatment altogether. Casarett works with CareYaya as a partner physician.
+
+Casarett's mother battled multiple myeloma, a cancer of the blood's plasma cells, and faced repeated insurance denials for pricey yet necessary medication. Because she and her husband had advanced scientific backgrounds, and a son with a medical degree, they meticulously tracked appeals and often won.
+
+"Our appeals were successful," he said. "But what about everybody else? What prayer does a single mom with two jobs and a high school education have against a multibillion-dollar insurance industry?"
+
+The organization has expanded beyond its pilot program at Wilmington Health's rheumatology clinic in North Carolina to clinics and hospitals around the US, offering free access to patients and caregivers. Shah said thousands of patients have used Counterforce's tools to overturn denials for treatments that would otherwise have been out of reach.
+
+Shah's longer-term vision is for tools like Counterforce to become trusted, objective arbiters -- where patients and insurers recognize their appeals as valid, reliable and evidence-based.
+
+Lowering the cost barrier with AI
+
+When asked why specifically AI was chosen to be the go-to tool, cost was a big caveat. Counterforce is free to use because of funding from several grants and investments from venture partners, including a $2.47 million grant from PennAITech, a University of Pennsylvania research center developing AI and tech to support aging and independence.
+
+Shah said keeping this tool accessible was a priority to allow more people the opportunity to appeal. While there are options to hire patient advocates to review denials and form appeals, they can be pricey, ranging from $80 to $150 per hour, depending on the advocate's set rates.
+
+According to a 2025 report from KFF, the average out-of-pocket spending for health care services had reached $1,425 per person per year by 2022.
+
+Adding an additional $300 to $1,000 to hire help to write an appeal is likely not feasible for many low-income or middle-class Americans.
+
+"Right now, appealing is really for the rich, or I would even say the ultra-rich," Shah said. "To solve this problem, [we had] to figure out a way to do it for free or dirt cheap because people don't have $300 to spend on a patient advocate when they can't afford the medicine they critically need. We thought AI would be the perfect use case because the ongoing cost per user is literally pennies."
+
+For now, Shah said Counterforce intends to remain free for individuals.
+
+How to get started with Counterforce Health
+
+Before beginning with any service that collects sensitive health information, you should always consider privacy. Counterforce Health collects personal and health-related data -- such as your insurance details, denial letters and medical background -- to generate appeals. The company states that it does not sell this information, uses encryption and other safeguards to protect it, and only shares data with trusted service providers or third parties under confidentiality and legal compliance requirements.
+
+To get started with Counterforce Health, you can visit the homepage, click "Start Free Appeal" and you'll be prompted to fill out a brief questionnaire of information, such as why you're visiting the website and basic information about your insurance denial. From there, you will provide your denial letter and insurance details, and the system's AI generates a fully drafted, editable appeal ready to submit.

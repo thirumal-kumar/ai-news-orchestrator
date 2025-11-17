@@ -1,0 +1,19 @@
+This week, Meta asked a US district court to toss a lawsuit alleging that the tech giant illegally torrented pornography to train AI.
+
+The move comes after Strike 3 Holdings discovered illegal downloads of some of its adult films on Meta corporate IP addresses, as well as other downloads that Meta allegedly concealed using a “stealth network” of 2,500 “hidden IP addresses.” Accusing Meta of stealing porn to secretly train an unannounced adult version of its AI model powering Movie Gen, Strike 3 sought damages that could have exceeded $350 million, TorrentFreak reported.
+
+Filing a motion to dismiss the lawsuit on Monday, Meta accused Strike 3 of relying on “guesswork and innuendo,” while alleging that Strike 3 “has been labeled by some as a ‘copyright troll’ that files extortive lawsuits.” Requesting that all copyright claims be dropped, Meta argued that there is no evidence that the tech giant directed any of the downloads of about 2,400 adult movies owned by Strike 3—or was even aware of the illegal activity.
+
+Strike 3 also cited “no facts to suggest that Meta has ever trained an AI model on adult images or video, much less intentionally so,” Meta claimed.
+
+“These claims are bogus,” Meta’s spokesperson told Ars.
+
+Meta Argues Downloads Were for “Personal Use”
+
+Notably, the alleged downloads spanned seven years, starting in 2018. That’s about four years before Meta’s AI efforts “researching Multimodal Models and Generative Video” began, making it implausible the downloads were intended for AI training, Meta claims. An even more “glaring” defect, Meta claims, is that Meta’s terms prohibit generating adult content, “contradicting the premise that such materials might even be useful for Meta’s AI training.”
+
+Instead, Meta claims, available evidence “is plainly indicative” that the flagged adult content was torrented for “private personal use”—since the small amount linked to Meta IP addresses and employees represented only “a few dozen titles per year intermittently obtained one file at a time.”
+
+“The far more plausible inference to be drawn from such meager, uncoordinated activity is that disparate individuals downloaded adult videos for personal use,” Meta’s filing says.
+
+For example, unlike lawsuits raised by book authors whose works are part of an enormous dataset used to train AI, the activity on Meta’s corporate IP addresses allegedly only amounted to about 22 downloads per year. That is nowhere near the “concerted effort to collect the massive datasets Plaintiffs allege are necessary for effective AI training,” Meta claims.

@@ -1,0 +1,93 @@
+AI steps in to detect the world's deadliest infectious disease
+
+toggle caption ARCAD Santé PLUS
+
+On a Thursday morning last month, Boniaba Community Health Center in Mali was running a TB screening. There was no doctor in sight. Yet, a mother plagued by coughing got an answer in a matter of seconds: She was positive for TB.
+
+A few years ago, she'd have been lucky if there was a screening nearby. And still, she'd have had to wait a week or two for a sputum test to be sent to a lab and results to come back.
+
+The difference? A mobile x-ray machine and an AI algorithm are detecting TB. (In case you're not familiar with AI terminology — this is basically a computer program trained on a whole lot of data.)
+
+Sponsor Message
+
+TB is the world's top infectious disease killer — with 3,500 people dying of it each day for an annual total of more than 1.2 million deaths. And the numbers are going up. One of the hurdles in tackling the epidemic has been a global shortage of radiologists to diagnose this bacterial infection that usually affects the lungs.
+
+"There are countries in which there are less than five radiologists. It's like a disaster. And, even if you have some, they will always be in the capitals," says Dr. Lucica Ditiu , executive director of the Stop TB Partnership, an advocacy organization.
+
+Now, she says, over 80 low- and middle-income countries are turning to AI to screen people for TB.
+
+"It is revolutionary," Ditiu says.
+
+For example, she says, a nomadic population in Nigeria is benefiting. "You're in the middle of nowhere. There are these guys. There's cattle. There is dust and nothing else. And they are doing these x-rays with AI. It's unreal," says Ditiu, whose organization was among the pioneers in developing this technology eight years ago.
+
+The AI models are also being used in refugee camps in Chad. "There are no radiologists. So who gets to look at the [x-ray] and say: 'Is there a problem here or not?' Well, actually, AI does," say Peter Sands , the executive director of the Global Fund to Fight AIDS, TB and Malaria, which has invested close to $200 million into AI-enabled TB screenings in the past four years. "It's brilliant."
+
+Sponsor Message
+
+Proponents say they are glimpsing the future, where AI accelerates the world's ability to detect and control diseases in some of the hardest-to-reach pockets of society. Others urge caution, saying more regulations and guardrails are necessary to protect patients in low- and middle-income countries.
+
+"A big difference"
+
+At the Boniaba Community Health Center, the mother is one of dozens of people who get an x-ray from a mobile x-ray machine that Diakité Lancine has set up. He's not a doctor but has been trained to take x-rays. The image he snaps is sent directly to his computer, where the AI model reads it and spits out a score based on how much AI thinks the image looks like TB and a picture of the person's lungs that looks almost like a heat map.
+
+"The blue there is nothing bad, but whenever you see the red — the red means this part is not good," explains Lancine on the morning he screens the mother.
+
+He works for the local nonprofit ARCAD Santé PLUS and does TB screenings around the West African country, arriving with just a few bags — for his mobile x-ray machine, his computer and a battery pack in case there's no electricity.
+
+As soon as the mother's screening comes back with several red patches, he collects a sputum sample to send to the lab for confirmation. Then he tells her to go home quickly and bring her five kids back so he can check them too. TB spreads through the air when someone with active TB coughs, laughs or talks and can be transmitted readily in households.
+
+Almost instantly, AI tells them: Three of her kids appear to have TB. Soon, Lacine says, they'll started on a six month course of antibiotics to treat the TB.
+
+"Having AI makes a big difference," says Bassy Keita, the program officer at ARCAD Santé PLUS, which has received support from the Global Fund. He explains that producing sputum samples was often hard for kids — it requires coughing up mucus from deep in the lungs. Since AI screenings were introduced they've been able to rapidly weed out the people who do not have any indication of TB on their x-rays and only doing sputum samples for those who the AI model shows could have TB. Since incorporating AI into their screenings, they've cut the number of sputum samples by about half.
+
+Sponsor Message
+
+TB at the forefront
+
+As a professor and computer scientist at MIT, Regina Barzilay has spent years building AI models to detect breast cancer and lung cancer. Then, when a hospital in Sri Lanka told her it couldn't afford to buy off-the-shelf AI models for TB screenings, she agreed to build one for them.
+
+As she got to work this past year, she says, she immediately understood why TB is at the vanguard of the global health challenges with AI solutions.
+
+"You can see TB. TB is visual. You have an x-ray. You have a label which says whether they have it or not — and you just train the model," Barzilay says, adding that it only took her a few months and less than $50,000 to make her model. "It's straightforward, very cheap, very fast to develop."
+
+Unlike the equipment needed for mammograms or blood tests, x-ray machines for TB are widely available in low-resource settings. And it doesn't take much training for someone to use it.
+
+Plus, Ditiu adds, the need is huge. In 2023, there were 10.8 million new cases of TB up from 10.1 million in 2020, according to the WHO , with the vast majority of cases in low- and middle-income countries.
+
+Ditiu believes TB is only the start. Some of the AI models used for TB can already diagnose other conditions, including lung cancer, pneumonia and certain cardiovascular issues.
+
+Barzilay predicts that in many low-income countries AI will soon be integrated into health systems similar to how much of Africa skipped over landlines and went straight to cell phones.
+
+"AI is going to be adopted much faster in developing countries because they have serious unmet needs and the clinician understands they need other help," she says. "Most of this technology is developed in the United States, but it's applied elsewhere."
+
+She say places like the U.S. have been slower to integrate AI models into health care because, even if they are FDA approved, they are often not widely utilized or integrated into care guidelines drawn up by professional societies.
+
+Sponsor Message
+
+"A real challenge for the developing nations"
+
+But some are urging that enthusiasm for the technology not to get ahead of vigilance.
+
+Erwin John Carpio is a radiologist in the Philippines who recently helped the Philippines College of Radiologists draft AI guidelines. He has studied the use of AI to screen for TB in some of the country's far-flung provinces.
+
+He says many high-income countries already have regulations and guardrails for using AI in health. "It is a real challenge for the developing nations, because usually the technology is offered to us for free. But you want to avoid [problems]," he says.
+
+For example, Carpio says, what happens when the AI model misses a TB diagnosis and it says someone is healthy when in fact they need medical attention?
+
+In the U.K., he says, there's a system in place for reporting such situations and improving patient safety. There's a similar situation in the U.S. when the Food and Drug Administration approves an AI model. Not so in the Philippines, says Carpio, "in our country, we don't have the laws in place yet."
+
+Another big worry he has is that a model won't let the users know if it's no longer working or just not sure about a case. He says models can "drift," meaning their performance deteriorates over time. "They fail silently. They don't tell you that they're making a mistake," Carpio says. "That's the main concern now."
+
+This worry about AI mistakes can be remedied by training the model to spit out complicated cases and by putting in place continual quality control checks by outside experts — as happens in Lancine's screening program in Mali and other Global Fund-backed projects.
+
+But, this quality check takes "an entire team of experts," explains Carpio. "Not only will you need a radiologist, you're going to need a computer scientist, a data scientist [and] an AI engineer." Add this all up — plus the enormous energy that AI consumes — and it's not quite as cheap and easy as it looks, he says.
+
+Sponsor Message
+
+But advocates argue the AI has to be compared to the alternative.
+
+Barzilay aruges that medical errors — made by doctors — are very common. And Sands, of the Global Fund, says that "we have to confront the fact that in many of the environments in which we're using this, there are very, very few radiologists [to do TB diagnoses]" — so it's better than nothing.
+
+Sands points to data showing that the world has gotten substantially better at finding people with TB since the World Health Organization blessed the AI technology in 2021 and released a toolkit on how to properly calibrate it to each local population and setting.
+
+The big question Barzilay says she's left with: Will medical care be available for all the people getting diagnosed?

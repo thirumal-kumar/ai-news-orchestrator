@@ -1,0 +1,13 @@
+streamlit
+requests
+feedparser
+beautifulsoup4
+newspaper3k
+python-dateutil
+dateparser
+lxml
+html5lib
+certifi
+charset-normalizer
+idna
+urllib3
