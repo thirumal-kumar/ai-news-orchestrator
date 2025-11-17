@@ -7,7 +7,8 @@ from event_extractor import extract_events_from_text
 
 def safe_event(summary, date, sources):
     """
-    ALWAYS returns a unified timeline event structure.
+    Always return unified safe event format.
+    Prevents KeyError in UI.
     """
     parsed = None
     if date:
@@ -26,8 +27,8 @@ def safe_event(summary, date, sources):
 
 def infer_timeline_with_llm(events, openrouter_key):
     """
-    LLM-based timeline inference.
-    Returns a list of unified SAFE events.
+    Use Claude (OpenRouter) to infer missing dates.
+    Enforces strict JSON output.
     """
     if not openrouter_key:
         return []
@@ -35,17 +36,26 @@ def infer_timeline_with_llm(events, openrouter_key):
     openai.api_key = openrouter_key
     openai.api_base = "https://openrouter.ai/api/v1"
 
+    # Use first few sentences for efficient processing
     text_block = "\n".join([e["sentence"] for e in events[:20]])
 
     prompt = f"""
-    Extract a timeline of events from the following text.
-    Return ONLY JSON in this format:
-    [
-       {{ "summary": "...", "date": "YYYY-MM-DD or null" }}
-    ]
-    Text:
-    {text_block}
-    """
+You are generating a news timeline from multiple articles.
+
+Rules:
+1. If a sentence contains a date, use that date.
+2. If no date is explicitly given, infer the date from context.
+3. If an article mentions a publication date, assume events occur ON or BEFORE that date.
+4. ALWAYS output STRICT JSON array, no markdown, no comments.
+
+Correct JSON format:
+[
+  {{ "summary": "Event description", "date": "YYYY-MM-DD or null" }}
+]
+
+TEXT:
+{text_block}
+"""
 
     try:
         resp = openai.ChatCompletion.create(
@@ -53,48 +63,56 @@ def infer_timeline_with_llm(events, openrouter_key):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300
         )
+
         raw = resp["choices"][0]["message"]["content"]
+        raw = raw.replace("```json", "").replace("```", "").strip()
+
         data = json.loads(raw)
 
-        safe = []
+        # Convert to safe event structure
+        final = []
         for e in data:
-            safe.append(
+            final.append(
                 safe_event(
                     summary=e.get("summary", "Event"),
                     date=e.get("date"),
                     sources=[]
                 )
             )
-        return safe
+        return final
 
-    except:
+    except Exception:
         return []
 
 
 def build_timeline_from_cleaned(cleaned_articles, use_llm=True):
     """
-    Main function: builds a safe timeline structure.
+    Build a clean timeline from cleaned articles.
+    LLM timeline → fallback regex → fallback recent events.
     """
     all_events = []
 
     for art in cleaned_articles:
-        events = extract_events_from_text(art.get("cleaned_text") or "")
+        text = art.get("cleaned_text") or ""
         source = art.get("url")
+        pub = art.get("published_at")
+
+        events = extract_events_from_text(text)
         for e in events:
             all_events.append({
                 "sentence": e["sentence"],
-                "date": e["date"],
+                "date": e["date"] or pub,   # default to publication date
                 "source": source
             })
 
-    # Step 1 — LLM inference if enabled
+    # Prefer LLM inference
     if use_llm:
         key = os.getenv("OPENROUTER_API_KEY")
-        llm_events = infer_timeline_with_llm(all_events, key)
-        if llm_events:
-            return llm_events
+        llm = infer_timeline_with_llm(all_events, key)
+        if llm:
+            return llm
 
-    # Step 2 — Regex timeline fallback
+    # Regex-only timeline
     dated = [e for e in all_events if e["date"]]
     dated.sort(key=lambda x: x["date"])
 
@@ -104,18 +122,18 @@ def build_timeline_from_cleaned(cleaned_articles, use_llm=True):
             safe_event(
                 summary=e["sentence"],
                 date=e["date"],
-                sources=[e.get("source")]
+                sources=[e["source"]]
             )
         )
 
-    # Step 3 — No dates at all → return top events
+    # Last fallback: no dates at all
     if not final:
         for e in all_events[:5]:
             final.append(
                 safe_event(
                     summary=e["sentence"],
                     date=None,
-                    sources=[e.get("source")]
+                    sources=[e["source"]]
                 )
             )
 
