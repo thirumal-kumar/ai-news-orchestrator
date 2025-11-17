@@ -12,3 +12,4 @@ charset-normalizer
 idna
 urllib3
 plotly
+lxml
