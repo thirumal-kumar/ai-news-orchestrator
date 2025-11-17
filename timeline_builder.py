@@ -1,132 +1,85 @@
-# timeline_builder.py
-"""
-Improved AI timeline engine:
-- Removes duplicate events
-- Better clustering
-- More stable date inference
-"""
-
-from datetime import datetime
 import os
-import re
-import requests
+import openai
+import json
 import dateparser
-from difflib import SequenceMatcher
-from collections import Counter
+from typing import List, Dict, Any
 from event_extractor import extract_events_from_text
 
 
-OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "deepseek/deepseek-r1:free"
+def infer_dates_with_llm(events: List[Dict[str, Any]], openrouter_key: str):
+    """
+    Use OpenRouter LLM to infer missing dates from context.
+    """
+    if not openrouter_key:
+        return events
 
+    openai.api_key = openrouter_key
+    openai.api_base = "https://openrouter.ai/api/v1"
 
-def _similar(a, b):
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    text_block = "\n".join([e["sentence"] for e in events[:20]])
 
-
-def _llm_date(sentence, published_iso):
-    if not OPENROUTER_KEY:
-        return None
-
-    prompt = (
-        "Infer the exact date (YYYY-MM-DD) mentioned or implied here. "
-        "If unclear, return NONE.\n"
-        f"Article date: {published_iso}\n"
-        f"Sentence: {sentence}"
-    )
+    prompt = f"""
+    From this text, extract a timeline of events with inferred dates.
+    Return ONLY JSON:
+    [
+       {{ "summary": "...", "date": "YYYY-MM-DD or null" }}
+    ]
+    Text:
+    {text_block}
+    """
 
     try:
-        resp = requests.post(
-            OPENROUTER_URL,
-            json={
-                "model": OPENROUTER_MODEL,
-                "messages": [
-                    {"role": "system", "content": "Return ONLY a date or NONE."},
-                    {"role": "user", "content": prompt},
-                ],
-                "max_tokens": 15,
-                "temperature": 0,
-            },
-            headers={"Authorization": f"Bearer {OPENROUTER_KEY}"},
-            timeout=20,
+        resp = openai.ChatCompletion.create(
+            model="openrouter/anthropic/claude-3.5-sonnet",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300
         )
+        data = resp["choices"][0]["message"]["content"]
 
-        txt = resp.json()["choices"][0]["message"]["content"].strip()
-        m = re.search(r"\d{4}-\d{2}-\d{2}", txt)
-        return m.group(0) if m else None
-
-    except Exception:
-        return None
+        return json.loads(data)
+    except:
+        return []
 
 
-def build_timeline_from_cleaned(cleaned, use_llm=True):
-    raw_events = []
-    seen_sentences = set()
+def build_timeline_from_cleaned(cleaned_articles: List[Dict[str, Any]], use_llm=True):
+    """
+    Build a timeline using regex events + optional LLM inference.
+    """
+    all_events = []
 
-    for art in cleaned:
-        text = art.get("cleaned_text") or ""
-        title = art.get("title") or ""
-        pub = art.get("published_at")
-        pub_dt = dateparser.parse(pub) if pub else None
+    # Extract events from each article
+    for art in cleaned_articles:
+        events = extract_events_from_text(art.get("cleaned_text") or "")
+        source = art.get("url")
+        for e in events:
+            e["source"] = source
+        all_events.extend(events)
 
-        events = extract_events_from_text(text, title=title)[:5]
+    # If user wants AI-inferred dates
+    if use_llm:
+        key = os.getenv("OPENROUTER_API_KEY")
+        llm_events = infer_dates_with_llm(all_events, key)
+        if llm_events:
+            # Convert LLM output into standard structure
+            final = []
+            for e in llm_events:
+                final.append({
+                    "summary": e["summary"],
+                    "date": e.get("date"),
+                    "sources": []  # LLM loses source, optional
+                })
+            return final
 
-        for ev in events:
-            sent = ev["sentence"].strip()
+    # Fallback: sort regex-detected dates
+    dated = [e for e in all_events if e["date"]]
+    dated.sort(key=lambda x: x["date"])
 
-            # Skip duplicates
-            key = sent.lower()
-            if key in seen_sentences:
-                continue
-            seen_sentences.add(key)
+    final = []
+    for e in dated:
+        final.append({
+            "summary": e["sentence"],
+            "date": e["date"],
+            "sources": [e.get("source")]
+        })
 
-            # Try parse explicit date
-            dt = dateparser.parse(sent, settings={"PREFER_DATES_FROM": "past"})
-            date_iso = dt.date().isoformat() if dt else None
-
-            # Try LLM if needed
-            if not date_iso and use_llm and pub:
-                inferred = _llm_date(sent, pub)
-                if inferred:
-                    date_iso = inferred
-                    dt = dateparser.parse(date_iso)
-
-            # Fallback → article date
-            if not date_iso and pub_dt:
-                date_iso = pub_dt.date().isoformat()
-                dt = pub_dt
-
-            raw_events.append({
-                "sentence": sent,
-                "source": art.get("source"),
-                "date_iso": date_iso,
-                "date": dt,
-            })
-
-    # Cluster similar events
-    timeline = []
-    for ev in raw_events:
-        placed = False
-        for t in timeline:
-            if _similar(ev["sentence"], t["summary"]) > 0.55:
-                t["sources"].add(ev["source"])
-                t["examples"].append(ev["sentence"])
-                placed = True
-                break
-
-        if not placed:
-            timeline.append({
-                "summary": ev["sentence"],
-                "date": ev["date"],
-                "date_iso": ev["date_iso"],
-                "sources": {ev["source"]},
-                "examples": [ev["sentence"]],
-            })
-
-    # Sort by date → undated at bottom
-    dated = [t for t in timeline if t["date"]]
-    undated = [t for t in timeline if not t["date"]]
-
-    dated_sorted = sorted(dated, key=lambda x: x["date"])
-    return dated_sorted + undated
+    return final

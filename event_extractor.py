@@ -1,56 +1,58 @@
-# event_extractor.py
-"""
-Event extractor:
-- Splits article text into sentences
-- Finds date mentions (dateparser)
-- Extracts named entities per sentence (spaCy)
-- Returns list of event dicts with: date (datetime or None), sentence, entities
-"""
-
 import re
-from typing import List, Dict, Any, Optional
 import dateparser
-import spacy
+from typing import List, Dict, Any
 
-# Ensure you installed: pip install spacy dateparser
-# And downloaded a model: python -m spacy download en_core_web_sm
-nlp = spacy.load("en_core_web_sm")
+# Detect short date formats
+DATE_PATTERN = re.compile(
+    r'\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b'
+)
 
+# Detect month names
+MONTH_PATTERN = re.compile(
+    r'\b(January|February|March|April|May|June|July|August|September|October|November|December'
+    r'|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b',
+    re.IGNORECASE
+)
 
-def _sentences(text: str) -> List[str]:
-    # fallback sentence splitter using spacy
-    doc = nlp(text)
-    return [sent.text.strip() for sent in doc.sents]
-
-
-def _find_date_in_text(text: str) -> Optional[Any]:
-    # try to parse explicit dates in the sentence
-    # dateparser can handle "yesterday", "Nov 17", "on Friday", etc.
-    dt = dateparser.parse(text, settings={"PREFER_DATES_FROM": "past"})
-    return dt
+# Numeric mismatch detection
+NUMBER_PATTERN = re.compile(r'\b\d+(?:\.\d+)?\b')
 
 
-def extract_events_from_text(text: str, title: str = None) -> List[Dict]:
+def extract_events_from_text(text: str) -> List[Dict[str, Any]]:
+    """
+    Cloud-safe event extractor WITHOUT spaCy.
+    Uses regex + dateparser + heuristics.
+    Returns list of events: { "sentence", "date", "numbers" }
+    """
     events = []
     if not text:
         return events
 
-    for sent in _sentences(text):
-        # skip short sentences
-        if len(sent) < 30:
+    # Split into sentences
+    raw_sentences = re.split(r'(?<=[.!?])\s+', text)
+
+    for sent in raw_sentences:
+        sent = sent.strip()
+        if len(sent) < 40:
             continue
 
-        dt = _find_date_in_text(sent)
-        # also try to anchor on title/published date later in pipeline if dt is None
+        # Extract dates
+        dates = DATE_PATTERN.findall(sent)
+        has_month = MONTH_PATTERN.search(sent)
 
-        doc = nlp(sent)
-        ents = [{"text": ent.text, "label": ent.label_} for ent in doc.ents]
+        parsed_date = None
+        if dates:
+            parsed_date = dateparser.parse(dates[0], settings={"STRICT_PARSING": False})
+        elif has_month:
+            parsed_date = dateparser.parse(sent, settings={"STRICT_PARSING": False})
 
-        # Heuristic: sentences containing numbers/years or explicit date words are more likely events
-        if dt or re.search(r"\b(20\d{2}|19\d{2}|today|yesterday|tomorrow|tonight|on|by|since|week|month)\b", sent, re.I):
-            events.append({
-                "date": dt,             # may be None
-                "sentence": sent,
-                "entities": ents,
-            })
+        # Extract numbers
+        nums = NUMBER_PATTERN.findall(sent)
+
+        events.append({
+            "sentence": sent,
+            "date": parsed_date.isoformat() if parsed_date else None,
+            "numbers": nums or []
+        })
+
     return events
