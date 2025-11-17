@@ -1,84 +1,81 @@
-import time
 import requests
+import streamlit as st
+import time
 
-# -------------------------------------------------
-# CONFIG — Replace with your API key
-# -------------------------------------------------
-OPENROUTER_API_KEY = "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"
-
-# New endpoint (old one is dead)
+# ---------------------------
+# CONFIG
+# ---------------------------
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Default model
-DEFAULT_MODEL = "openai/gpt-4o-mini"
+# Load key from Streamlit Secrets (never from file)
+OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
+
+HEADERS = {
+    "Authorization": f"Bearer {OPENROUTER_KEY}",
+    "Content-Type": "application/json",
+    "X-Title": "AI News Orchestrator"
+}
 
 
-# -------------------------------------------------
-# INTERNAL API CALL WRAPPER
-# -------------------------------------------------
-def _call_openrouter(messages, model=DEFAULT_MODEL, max_tokens=400, retries=3):
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "X-Title": "AI News Orchestrator"
-    }
+# ---------------------------
+# INTERNAL CALL WRAPPER
+# ---------------------------
+def _call_openrouter(messages, max_tokens=500, retries=3):
+    """
+    Robust OpenRouter call with retry, error handling, and validation.
+    """
 
     payload = {
-        "model": model,
+        "model": "openai/gpt-4o-mini",
         "messages": messages,
         "max_tokens": max_tokens
     }
 
-    last_error = None
-
     for attempt in range(1, retries + 1):
         try:
-            response = requests.post(
-                OPENROUTER_URL,
-                headers=headers,
-                json=payload,
-                timeout=40
-            )
+            response = requests.post(OPENROUTER_URL, headers=HEADERS, json=payload, timeout=30)
 
-            # Raise for 4xx and 5xx
-            response.raise_for_status()
+            # Basic network failure
+            if response.status_code != 200:
+                raise Exception(
+                    f"Bad status {response.status_code}: {response.text}"
+                )
 
             data = response.json()
 
+            # Validate structure
+            if "choices" not in data or not data["choices"]:
+                raise Exception(f"Malformed API response: {data}")
+
             return data["choices"][0]["message"]["content"]
 
-        except requests.exceptions.RequestException as e:
-            last_error = e
-            print(f"[OpenRouter] Attempt {attempt}/{retries} failed: {e}")
+        except Exception as e:
+            if attempt == retries:
+                return f"[ERROR contacting LLM after {retries} attempts]\n{e}"
+            time.sleep(1.5)
 
-            # Small delay before retry
-            time.sleep(1.5 * attempt)
-
-    # If we ever reach here, API failed after all retries
-    raise RuntimeError(
-        f"OpenRouter API failed after {retries} retries. Last error: {last_error}"
-    )
+    return "[LLM call failed]"  # fallback (should never happen)
 
 
-# -------------------------------------------------
-# PUBLIC SUMMARIZATION FUNCTION
-# (USED BY YOUR APP)
-# -------------------------------------------------
-def summarize_text(text, prompt_add=""):
+# ---------------------------
+# PUBLIC SUMMARIZER
+# ---------------------------
+def summarize_text(text: str, prompt_add: str = "") -> str:
     """
-    Generates a clean summary of the given text.
+    Summarizes a long input text using OpenRouter.
     """
-    if not text or not text.strip():
-        return "No text available for summarization."
+
+    if not text or len(text.strip()) < 40:
+        return "Not enough content to summarize."
 
     system_prompt = (
-        "You are an expert news summarizer. Your job is to produce a clear, "
-        "factual, concise summary without adding extra speculation. "
-        "Do NOT change meaning. Focus on correctness."
+        "You are an AI assistant that writes clean, factual, concise summaries "
+        "from multiple news articles. Remove duplicates. Remove speculation. "
+        "Focus on verified facts only."
     )
 
     if prompt_add:
-        system_prompt += " " + prompt_add
+        system_prompt += "\n" + prompt_add
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -86,3 +83,14 @@ def summarize_text(text, prompt_add=""):
     ]
 
     return _call_openrouter(messages, max_tokens=400)
+
+
+# ---------------------------
+# HELPER FOR COMBINATIONS
+# ---------------------------
+def summarize_snippets(snippets: list[str]) -> str:
+    """
+    Accepts list of text strings → returns combined summary.
+    """
+    combined = "\n\n".join(snippets)
+    return summarize_text(combined)

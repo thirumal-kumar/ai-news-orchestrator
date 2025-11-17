@@ -1,55 +1,44 @@
 # extractor.py
 import requests
 from bs4 import BeautifulSoup
-from typing import Dict
-import re
+from requests.exceptions import RequestException
 
-def extract_raw_html(url: str, timeout=12):
-    if not url:
-        return ""
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; NewsOrchestrator/1.0)"}
-    r = requests.get(url, headers=headers, timeout=timeout)
-    r.raise_for_status()
-    return r.text
+def extract_raw_html(url, timeout=10):
+    if not url or not isinstance(url, str):
+        return None
+    try:
+        r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
+        return r.text
+    except RequestException:
+        return None
 
-def clean_html_to_text(html: str) -> str:
+def _html_to_text(html):
     if not html:
         return ""
-    soup = BeautifulSoup(html, "html.parser")
-    # Try <article> first
+    soup = BeautifulSoup(html, "lxml")
+    # remove scripts/styles
+    for tag in soup(["script", "style", "header", "footer", "nav", "aside"]):
+        tag.decompose()
+    # prefer <article>
     article = soup.find("article")
-    text = ""
-    if article:
-        ps = article.find_all("p")
-        text = "\n\n".join(p.get_text().strip() for p in ps if p.get_text().strip())
-    else:
-        # fallback: collect largest continuous paragraph blocks
-        ps = soup.find_all("p")
-        text = "\n\n".join(p.get_text().strip() for p in ps if p.get_text().strip())
-    # minimal cleaning
-    text = re.sub(r"\s+\n", "\n", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    text_source = article or soup.body or soup
+    texts = [t.strip() for t in text_source.stripped_strings]
+    return " ".join(texts)
 
-def clean_article(article_or_url) -> Dict:
+def clean_article(article: dict) -> dict:
     """
-    Accept either article dict {'url':...} or url string.
-    Return dict with at least 'raw_html' and 'cleaned_text'.
+    article: dict with at least 'url' field (per data model)
+    returns same dict with 'raw_html' and 'cleaned_text' added (or empty string)
     """
-    url = ""
-    if isinstance(article_or_url, dict):
-        url = article_or_url.get("url", "") or ""
-    elif isinstance(article_or_url, str):
-        url = article_or_url
+    if not isinstance(article, dict):
+        raise TypeError("clean_article expects a dict article")
+    url = article.get("url") or ""
+    html = extract_raw_html(url)
+    if html:
+        article["raw_html"] = html
+        article["cleaned_text"] = _html_to_text(html)
     else:
-        return {"raw_html": "", "cleaned_text": ""}
-
-    if not url:
-        return {"raw_html": "", "cleaned_text": ""}
-
-    try:
-        html = extract_raw_html(url)
-        text = clean_html_to_text(html)
-        return {"raw_html": html, "cleaned_text": text}
-    except Exception:
-        return {"raw_html": "", "cleaned_text": ""}
+        article["raw_html"] = ""
+        article["cleaned_text"] = ""
+    return article

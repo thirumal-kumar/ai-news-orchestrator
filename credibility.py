@@ -1,26 +1,34 @@
 # credibility.py
 from collections import Counter
 from urllib.parse import urlparse
-from typing import List, Dict
 
 def domain_from_url(url: str) -> str:
+    if not url:
+        return ""
     try:
         p = urlparse(url)
-        return p.netloc.replace("www.", "") or url
+        return p.netloc.replace("www.", "")
     except Exception:
-        return url
+        return ""
 
-# simple credibility map (extend as needed)
-TRUSTED = {
-    "bbc.co.uk": 0.9, "bbc.com": 0.9, "reuters.com": 0.9, "thehindu.com": 0.8, "hindustantimes.com": 0.75,
-    "timesofindia.indiatimes.com": 0.7, "ndtv.com": 0.7
-}
-
-def score_sources(article_list: List[Dict]) -> Dict[str, float]:
-    domains = [domain_from_url(a if isinstance(a, str) else a.get("url","")) for a in article_list]
-    freq = Counter(domains)
+def score_sources(article_list):
+    """
+    Accepts article_list: list of dicts (data model).
+    Returns dict domain -> score (0..100).
+    """
+    domains = []
+    for a in article_list:
+        if isinstance(a, dict):
+            domains.append(domain_from_url(a.get("url", "") or ""))
+        elif isinstance(a, str):
+            domains.append(domain_from_url(a))
+    freq = Counter(d for d in domains if d)
     scores = {}
-    for d in set(domains):
-        base = TRUSTED.get(d, 0.6)
-        scores[d] = round(base, 2)
+    for d, c in freq.items():
+        # simple heuristic: large frequency -> more coverage (score up to 80)
+        score = min(80, 20 + c * 5)
+        # penalize suspicious TLDs (very simple)
+        if d.endswith(".xyz") or d.endswith(".ru"):
+            score = max(10, score - 30)
+        scores[d] = score
     return scores
