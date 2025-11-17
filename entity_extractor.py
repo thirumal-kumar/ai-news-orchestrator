@@ -1,34 +1,76 @@
-import spacy
-from collections import defaultdict
+"""
+Lightweight entity extractor — Streamlit Cloud compatible
+Uses OpenRouter/OpenAI instead of spaCy.
+"""
 
-# Load Spacy model safely
-try:
-    nlp = spacy.load("en_core_web_sm")
-except:
-    nlp = None
+import os
+from collections import defaultdict
+import requests
+import json
+
+OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+
+LLM_MODEL = "gpt-4o-mini"     # Small, cheap, very good at NER
+
+def llm_extract_entities(text: str) -> dict:
+
+    if not OPENROUTER_KEY:
+        return {
+            "PERSON": [],
+            "ORG": [],
+            "GPE": [],
+            "DATE": []
+        }
+
+    prompt = f"""
+Extract named entities from the following text.
+Return JSON with keys PERSON, ORG, GPE, DATE.
+
+Text:
+{text[:4000]}
+"""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    body = {
+        "model": LLM_MODEL,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
+
+    try:
+        resp = requests.post("https://openrouter.ai/api/v1/chat/completions",
+                             headers=headers, json=body, timeout=20)
+
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+
+        return json.loads(content)
+
+    except Exception as e:
+        return {
+            "PERSON": [],
+            "ORG": [],
+            "GPE": [],
+            "DATE": []
+        }
 
 
 def extract_entities(cleaned_articles):
     """
-    Extract PERSON, ORG, GPE, DATE entities from cleaned article text.
-    cleaned_articles = list of dicts with 'cleaned_text'
+    cleaned_articles: list of dicts with "cleaned_text"
     """
-
-    if not nlp:
-        return {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
-
-    all_entities = defaultdict(list)
+    merged = defaultdict(set)
 
     for art in cleaned_articles:
-        text = art.get("cleaned_text", "")
-        if not text.strip():
-            continue
+        text = art.get("cleaned_text") or ""
+        ents = llm_extract_entities(text)
+        for k, v in ents.items():
+            for item in v:
+                merged[k].add(item)
 
-        doc = nlp(text)
-
-        for ent in doc.ents:
-            if ent.label_ in ["PERSON", "ORG", "GPE", "DATE"]:
-                all_entities[ent.label_].append(ent.text)
-
-    # Deduplicate + sort
-    return {label: sorted(set(values)) for label, values in all_entities.items()}
+    return {k: list(v) for k, v in merged.items()}
