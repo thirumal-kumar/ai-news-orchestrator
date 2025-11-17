@@ -1,118 +1,101 @@
-import feedparser
 import requests
 from urllib.parse import quote
+from bs4 import BeautifulSoup
+from dateutil import parser as dateparser
 
+# =======================================================================
+# GOOGLE NEWS RSS FALLBACK (always works, no API key required)
+# =======================================================================
 
-# ============================================================
-# Google News RSS Fetcher (self-contained)
-# ============================================================
-
-def fetch_google_news_articles_rss(query):
-    """
-    Direct Google News RSS fetcher.
-    Returns list of dicts with title, link, published, summary.
-    """
-    url = f"https://news.google.com/rss/search?q={quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
-
+def fetch_google_rss(query: str, max_results: int = 10):
+    """Fetch news headlines from Google News RSS."""
+    rss_url = f"https://news.google.com/rss/search?q={quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
     try:
-        feed = feedparser.parse(url)
+        resp = requests.get(rss_url, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "xml")
+
+        articles = []
+        for item in soup.find_all("item")[:max_results]:
+            title = item.title.text if item.title else ""
+            link = item.link.text if item.link else ""
+            pub_date = item.pubDate.text if item.pubDate else ""
+
+            try:
+                pub_date = str(dateparser.parse(pub_date))
+            except:
+                pass
+
+            articles.append({
+                "title": title,
+                "url": link,
+                "source": "Google News RSS",
+                "summary": "",
+                "published_at": pub_date
+            })
+        return articles
+
     except Exception:
         return []
 
-    articles = []
-    for entry in feed.entries:
-        articles.append({
-            "title": entry.get("title", ""),
-            "url": entry.get("link", ""),
-            "published_at": entry.get("published", ""),
-            "source": entry.get("source", {}).get("title", ""),
-            "summary": entry.get("summary", "")
-        })
+# =======================================================================
+# OPTIONAL NEWSAPI FETCHER (only if key is provided)
+# =======================================================================
 
-    return articles
-
-
-# ============================================================
-# Normalize (uniform dictionary)
-# ============================================================
-
-def normalize_article(entry):
-    return {
-        "title": entry.get("title", "").strip(),
-        "url": entry.get("url") or entry.get("link") or "",
-        "published_at": entry.get("published_at", entry.get("pubDate", "")),
-        "source": entry.get("source", ""),
-        "summary": entry.get("summary", entry.get("description", ""))
-    }
-
-
-# ============================================================
-# Bing fallback (HTML scrape)
-# ============================================================
-
-def fetch_bing_fallback(query, max_results=10):
-    url = f"https://www.bing.com/news/search?q={quote(query)}"
-
+def fetch_newsapi(query: str, max_results: int, key: str):
+    """Fetch articles using NewsAPI if the user provides a key."""
+    url = (
+        f"https://newsapi.org/v2/everything?"
+        f"q={quote(query)}&sortBy=publishedAt&pageSize={max_results}&apiKey={key}"
+    )
     try:
-        r = requests.get(url, timeout=5)
-        if r.status_code != 200:
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+
+        if "articles" not in data:
             return []
+
+        results = []
+        for a in data["articles"]:
+            results.append({
+                "title": a.get("title", ""),
+                "url": a.get("url", ""),
+                "source": a.get("source", {}).get("name", "NewsAPI"),
+                "summary": a.get("description", ""),
+                "published_at": a.get("publishedAt", "")
+            })
+        return results
+
     except Exception:
         return []
 
-    articles = []
-    chunks = r.text.split("<a")
-    for c in chunks:
-        if "href=" not in c or "news/search" in c:
-            continue
-        try:
-            link = c.split('href="')[1].split('"')[0]
-            title = c.split(">")[1].split("<")[0]
-            if link.startswith("http") and len(title) > 5:
-                articles.append({
-                    "title": title,
-                    "url": link,
-                    "published_at": "",
-                    "source": "Bing News",
-                    "summary": ""
-                })
-        except:
-            pass
+# =======================================================================
+# MAIN FETCHER LOGIC (RSS → NewsAPI)
+# =======================================================================
 
-    return articles[:max_results]
+def fetch_articles(query: str, newsapi_key: str = "", max_results: int = 10):
+    """Unified article fetcher. Always returns a list of dicts."""
+    results = []
 
+    # 1) Try RSS first
+    rss_articles = fetch_google_rss(query, max_results)
+    results.extend(rss_articles)
 
-# ============================================================
-# MAIN FETCH FUNCTION
-# ============================================================
+    # 2) If NewsAPI key exists → merge results (dedupe by URL)
+    if newsapi_key:
+        api_articles = fetch_newsapi(query, max_results, newsapi_key)
+        results.extend(api_articles)
 
-def fetch_articles(query, news_api_key=None, max_results=10):
-    # Ensure integer
-    try:
-        max_results = int(max_results)
-    except:
-        max_results = 10
-
+    # DEDUPLICATE
     final = []
-
-    # 1. Google RSS
-    rss_articles = fetch_google_news_articles_rss(query)
-    final.extend([normalize_article(a) for a in rss_articles])
-
-    if len(final) >= max_results:
-        return final[:max_results]
-
-    # 2. Bing fallback
-    bing = fetch_bing_fallback(query, max_results)
-    final.extend(bing)
-
-    # Deduplicate
     seen = set()
-    uniq = []
-    for a in final:
-        u = a.get("url", "")
-        if u and u not in seen:
-            seen.add(u)
-            uniq.append(a)
 
-    return uniq[:max_results]
+    for a in results:
+        if not isinstance(a, dict):
+            continue
+        url = a.get("url", "")
+        if url and url not in seen:
+            seen.add(url)
+            final.append(a)
+
+    return final[:max_results]
