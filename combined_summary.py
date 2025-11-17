@@ -1,34 +1,20 @@
-# combined_summary.py
-"""
-Combine multiple article snippets into a single summary.
-Removes repeated or near-duplicate lines.
-"""
-
 import re
-from difflib import SequenceMatcher
 
-
-def _similar(a, b):
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
-
-
-def combine_snippets(snippets, similarity_threshold=0.75):
-    """
-    snippets: list of text blocks
-    Returns a clean combined summary without duplicates.
-    """
-    cleaned = []
+def combine_snippets(snippets):
+    clean = []
 
     for snip in snippets:
-        # Remove double spaces, HTML, noise
+        if not isinstance(snip, str):
+            continue
+
         s = re.sub(r"\s+", " ", snip).strip()
         if len(s) < 40:
             continue
 
-        # Deduplicate: skip if too similar to any existing line
-        if any(_similar(s, c) > similarity_threshold for c in cleaned):
-            continue
+        clean.append(s)
 
-        cleaned.append(s)
+    if not clean:
+        return "No meaningful content available for summary."
 
-    return "\n\n".join(cleaned)
+    joined = "\n\n".join(clean)
+    return f"### Unified AI Summary\n\n{joined}"

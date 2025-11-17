@@ -1,52 +1,32 @@
-import os
-from bs4 import BeautifulSoup
 import requests
-from typing import Optional
+from bs4 import BeautifulSoup
 
 
-def extract_raw_html(url: str) -> Optional[str]:
-    """Downloads raw HTML safely."""
+def extract_raw_html(url: str) -> str:
     try:
-        r = requests.get(url, timeout=10, headers={
-            "User-Agent": "Mozilla/5.0"
-        })
-        if r.status_code == 200:
-            return r.text
-        return None
+        if not url:
+            return ""
+        r = requests.get(url, timeout=8)
+        return r.text
     except:
-        return None
+        return ""
 
 
-def clean_html_to_text(html: str) -> str:
-    """Cleans HTML and extracts readable text using BeautifulSoup."""
-    soup = BeautifulSoup(html, "lxml")
+def clean_article(article) -> str:
+    """Convert article (dict or string) → cleaned text."""
+    if not isinstance(article, dict):
+        return ""
 
-    # Remove scripts, styles, ads
-    for tag in soup(["script", "style", "header", "footer", "nav", "aside"]):
-        tag.decompose()
-
-    # Extract paragraphs
-    texts = []
-    for p in soup.find_all("p"):
-        t = p.get_text(strip=True)
-        if len(t) > 40:  # avoid garbage
-            texts.append(t)
-
-    if not texts:
-        # fallback: all text
-        return soup.get_text("\n", strip=True)
-
-    return "\n\n".join(texts)
-
-
-def clean_article(article: dict) -> dict:
-    """Main extraction function."""
-    url = article.get("url")
+    url = article.get("url", "")
     html = extract_raw_html(url)
-    if html:
-        article["raw_html"] = html
-        article["cleaned_text"] = clean_html_to_text(html)
-    else:
-        article["cleaned_text"] = ""
 
-    return article
+    if not html:
+        return ""
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    for tag in soup(["script", "style", "noscript"]):
+        tag.extract()
+
+    text = soup.get_text(" ", strip=True)
+    return text[:5000]
