@@ -1,73 +1,91 @@
 # discrepancy_checker.py
 
-def safe_text(x):
+def safe(x):
     if not x:
         return ""
     if isinstance(x, dict):
-        return x.get("cleaned_text", "") or ""
+        return (x.get("cleaned_text") or 
+                x.get("content") or 
+                x.get("description") or 
+                "")
     return str(x)
+
 
 def find_discrepancies(cleaned_articles):
     """
-    Identify contradictions across article texts, titles, or published dates.
-    cleaned_articles: list of dicts (from extractor + fetcher)
-    Returns: dict summarizing possible discrepancies
+    Always returns meaningful discrepancies.
+    Never returns empty list.
+    Output is a dictionary so Streamlit JSON viewer renders correctly.
     """
 
-    discrepancies = {
-        "conflicting_dates": [],
-        "conflicting_titles": [],
-        "textual_mismatch_pairs": []
+    if not cleaned_articles or len(cleaned_articles) < 2:
+        return {
+            "note": "Not enough articles to compare."
+        }
+
+    # --------------------------------
+    # Extract key fields
+    # --------------------------------
+    titles = [a.get("title", "") for a in cleaned_articles]
+    dates = [a.get("published_at", "") for a in cleaned_articles]
+    texts = [safe(a) for a in cleaned_articles]
+
+    # --------------------------------
+    # Prepare container
+    # --------------------------------
+    out = {
+        "Title Differences": [],
+        "Publication Date Differences": [],
+        "Content Length Differences": [],
+        "Keyword Emphasis Differences": []
     }
 
-    # --------------------------
-    # COLLECT FIELDS
-    # --------------------------
-    titles = []
-    dates = []
-    texts = []
+    # --------------------------------
+    # TITLE DIFFERENCES
+    # --------------------------------
+    unique_titles = set([t for t in titles if t])
+    if len(unique_titles) > 1:
+        out["Title Differences"] = list(unique_titles)
 
-    for art in cleaned_articles:
-        titles.append(art.get("title") or "")
-        dates.append(art.get("published_at") or "")
-        texts.append(safe_text(art))
-
-    # --------------------------
-    # DATE CONTRADICTIONS
-    # --------------------------
+    # --------------------------------
+    # DATE DIFFERENCES
+    # --------------------------------
     unique_dates = set([d for d in dates if d])
     if len(unique_dates) > 1:
-        discrepancies["conflicting_dates"] = list(unique_dates)
+        out["Publication Date Differences"] = list(unique_dates)
 
-    # --------------------------
-    # TITLE CONTRADICTIONS
-    # --------------------------
-    unique_titles = set([t.strip() for t in titles if t])
-    if len(unique_titles) > 1:
-        discrepancies["conflicting_titles"] = list(unique_titles)
+    # --------------------------------
+    # CONTENT LENGTH DIFFERENCES
+    # --------------------------------
+    lengths = {i: len(texts[i]) for i in range(len(texts))}
+    if max(lengths.values()) - min(lengths.values()) > 300:
+        out["Content Length Differences"] = [
+            f"Article {i+1}: {lengths[i]} chars" for i in lengths
+        ]
 
-    # --------------------------
-    # TEXTUAL SIMILARITY CHECK
-    # --------------------------
-    # Very lightweight heuristic: length mismatch or keyword mismatch
-    for i in range(len(texts)):
-        for j in range(i + 1, len(texts)):
-            t1, t2 = texts[i], texts[j]
+    # --------------------------------
+    # KEYWORD EMPHASIS DIFFERENCES
+    # --------------------------------
+    keywords = ["pollution", "AQI", "PM2.5", "health", "government",
+                "traffic", "industry", "weather"]
 
-            if not t1 or not t2:
-                continue
+    emphasis = {}
+    for idx, txt in enumerate(texts):
+        lower = txt.lower()
+        emphasis[idx] = [kw for kw in keywords if kw.lower() in lower]
 
-            # Heuristic mismatch: texts differ by >70% length
-            len1, len2 = len(t1), len(t2)
-            length_ratio = abs(len1 - len2) / max(len1, len2)
+    if len(set([tuple(v) for v in emphasis.values()])) > 1:
+        out["Keyword Emphasis Differences"] = emphasis
 
-            if length_ratio > 0.7:
-                discrepancies["textual_mismatch_pairs"].append(
-                    {
-                        "article_1_title": titles[i],
-                        "article_2_title": titles[j],
-                        "reason": f"Large content mismatch ({length_ratio:.2f})"
-                    }
-                )
+    # --------------------------------
+    # ENSURE SOMETHING IS RETURNED
+    # --------------------------------
+    if (
+        not out["Title Differences"]
+        and not out["Publication Date Differences"]
+        and not out["Content Length Differences"]
+        and not out["Keyword Emphasis Differences"]
+    ):
+        out["note"] = "Articles appear broadly consistent. No large cross-article discrepancies detected."
 
-    return discrepancies
+    return out
